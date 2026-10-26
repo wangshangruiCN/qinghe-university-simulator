@@ -323,7 +323,7 @@ function renderLanding() {
             <div class="start-wordmark">青禾计划<small>UNIVERSITY SIMULATOR</small></div>
           </div>
           <div class="start-kicker">2026 · 四川办学试点</div>
-          <h1>从一纸合同开始，<br />办一所<em>真正被人记住</em>的大学。</h1>
+          <h1><span>从一纸合同开始，</span><span>办一所<em>真正被人记住</em></span><span>的大学。</span></h1>
           <p>
             你将从一所民办专科起步，决定开设什么专业、招多少学生、聘任怎样的人，
             并在一届届毕业生的去向中，留下这所学校的名字。
