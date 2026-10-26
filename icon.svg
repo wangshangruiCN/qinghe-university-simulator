@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0c2b2d"/>
+  <circle cx="256" cy="256" r="168" fill="none" stroke="#d6bb86" stroke-width="8"/>
+  <rect x="132" y="132" width="248" height="248" fill="none" stroke="#d6bb86" stroke-width="3" opacity=".55"/>
+  <text x="256" y="315" text-anchor="middle" fill="#f1dfb8" font-size="230" font-family="serif">禾</text>
+</svg>

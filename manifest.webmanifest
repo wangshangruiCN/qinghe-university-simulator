@@ -1,0 +1,20 @@
+{
+  "name": "青禾计划 · 高校模拟器",
+  "short_name": "青禾计划",
+  "description": "从民办专科起步，经营一所属于自己的大学。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f0e7",
+  "theme_color": "#0d2b2d",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

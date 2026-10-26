@@ -1,0 +1,5 @@
+.tools/
+.browser-*/
+qa-*.png
+qa-*.mjs
+server.log
