@@ -2,6 +2,14 @@
 
 一个从民办专科起步的中文网页模拟经营游戏原型。无需安装第三方依赖，直接由浏览器运行。
 
+## 在线玩
+
+- GitHub Pages：[wangshangruicn.github.io/qinghe-university-simulator](https://wangshangruicn.github.io/qinghe-university-simulator/)
+- GitHub CDN（国内网络更稳定）：[打开手机版](https://cdn.jsdelivr.net/gh/wangshangruiCN/qinghe-university-simulator@main/index.html)
+- CDN 备用节点：[testingcf.jsdelivr.net](https://testingcf.jsdelivr.net/gh/wangshangruiCN/qinghe-university-simulator@main/index.html)
+
+在线版本支持手机浏览器，可通过浏览器菜单“添加到主屏幕”作为网页应用打开。
+
 ![青禾计划开局合同](start-screen.png)
 
 ## 启动
