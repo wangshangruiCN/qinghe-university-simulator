@@ -1,8 +1,7 @@
 import {
-  ACADEMIC_CATALOG,
   BUILDINGS,
   CAMPUS_PLOTS,
-  COLLEGE_TEMPLATES,
+  COLLEGE_TEMPLATES_V2 as COLLEGE_TEMPLATES,
   COMPETITIONS,
   DIFFICULTIES,
   NATIONAL_UNIVERSITIES,
@@ -11,10 +10,31 @@ import {
   WORLD_UNIVERSITIES,
 } from "./data.js";
 
+const APP_VERSION = "0.2.0";
+const CHANGELOG = [
+  "学院体系重构：10 个具体学院，专业直接归属学院",
+  "修复任何学院都能开设任意专业的问题",
+  "修复排名过虚：民办本科开局，省榜每年最多上升 3 名",
+  "修复全国榜与世界榜不显示本校位次的问题",
+  "招生改为按培养容量分四年自动分配",
+  "修复手机端帮助按钮不可见、不可点击的问题",
+  "开始页与设置页显示当前版本号",
+];
+
+const LEGACY_COLLEGE_MAP = {
+  digital: "computer",
+  manufacturing: "manufacturing",
+  business: "business",
+  health: "medicine",
+  creative: "art",
+  tourism: "tourism",
+};
+
 const SAVE_KEY = "qinghe-university-save-v1";
 const SAVED_AT_KEY = "qinghe-university-saved-at";
 
 const LEVEL_BONUS = {
+  本科: 0,
   专科: 0,
   职业本科: 90,
   专业硕士授权: 190,
@@ -37,7 +57,7 @@ const TUTORIAL_STEPS = [
   {
     kicker: "01 / 建校",
     title: "先建立一个学院",
-    body: "大学不是一次点满的技能树。你的第一所学院会决定首批专业、师资结构和校企资源。进入“学院与学科”，从六种建校方向中选择其一。",
+    body: "大学不是一次点满的技能树。你的第一所学院会决定首批专业、师资结构和校企资源。进入“学院与学科”，从十所学院方向中选择其一。",
     action: "去建立学院",
     view: "academic",
     art: "院",
@@ -53,7 +73,7 @@ const TUTORIAL_STEPS = [
   {
     kicker: "03 / 招生",
     title: "把批下来的计划招满",
-    body: "选择招生策略与覆盖范围。学校声誉、就业质量与投放预算共同决定报到率。录取人数会形成一届真实的学生 cohort，并影响未来三年的收入。",
+    body: "选择招生策略与覆盖范围。学校声誉、就业质量与投放预算共同决定报到率。录取人数会形成一届真实的学生 cohort，并影响未来四年的收入。",
     action: "启动招生",
     view: "admissions",
     art: "招",
@@ -82,7 +102,7 @@ const ui = {
   view: "dashboard",
   sidebarOpen: false,
   startForm: {
-    name: "青禾职业技术学院",
+    name: "青禾学院",
     difficulty: "steady",
     nature: "private",
     province: "四川省",
@@ -108,10 +128,56 @@ render();
 function loadState() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed.version === 2 ? parsed : migrateLegacyState(parsed);
   } catch {
     return null;
   }
+}
+
+function migrateLegacyState(legacy) {
+  const migrated = {
+    ...legacy,
+    version: 2,
+    school: {
+      ...legacy.school,
+      level: legacy.school.level === "专科" ? "本科" : legacy.school.level,
+    },
+    colleges: (legacy.colleges || []).map((college) => {
+      const nextId = LEGACY_COLLEGE_MAP[college.id];
+      if (!nextId) return null;
+      const template = COLLEGE_TEMPLATES.find((item) => item.id === nextId);
+      const programs = (college.disciplines || []).flatMap((discipline) =>
+        discipline.programs.map((program) => ({
+          id: program.id,
+          name: program.name,
+          code: program.code || "510000",
+        })),
+      );
+      return {
+        ...college,
+        id: nextId,
+        name: template.name,
+        code: template.code,
+        category: template.category,
+        icon: template.icon,
+        accent: template.accent,
+        summary: template.summary,
+        programs,
+      };
+    }).filter(Boolean),
+  };
+  migrated.admissions.annualQuota = migrated.admissions.annualQuota || Math.round((migrated.resources.capacity || 1200) / 4);
+  if (!migrated.rank) {
+    migrated.rank = {
+      provincial: 41,
+      national: 1000,
+      world: 9200,
+      strength: 16,
+    };
+  }
+  return migrated;
 }
 
 function saveState() {
@@ -183,26 +249,40 @@ function schoolStrength() {
   );
 }
 
-function getRankings() {
-  if (!state) return { provincial: 41, national: 1800, world: 8800, strength: 0 };
+function computeRawRankings() {
+  if (!state) return { provincial: 41, national: 1000, world: 9200, strength: 0 };
   const strength = schoolStrength();
   const bonus = LEVEL_BONUS[state.school.level] || 0;
   const provincial = SICHUAN_UNIVERSITIES.filter((item) => item.score > strength).length + 1;
   return {
     provincial,
-    national: clamp(Math.round(1180 - strength * 11 - bonus), 1, 1800),
-    world: clamp(Math.round(7000 - strength * 70 - bonus * 10), 1, 8800),
+    national: clamp(Math.round(1180 - strength * 11 - bonus), 1, 2000),
+    world: clamp(Math.round(9800 - strength * 40 - bonus * 8), 1, 12000),
     strength,
+  };
+}
+
+function getRankings() {
+  if (!state) return { provincial: 41, national: 1000, world: 9200, strength: 0 };
+  const raw = computeRawRankings();
+  const previous = state.rank?.provincial ?? raw.provincial;
+  const provincial = raw.provincial < previous
+    ? Math.max(raw.provincial, previous - 3)
+    : raw.provincial;
+  return {
+    ...raw,
+    provincial,
   };
 }
 
 function approxApprovalChance() {
   if (!state) return 0;
   const total = planTotal();
+  const quota = state.admissions.annualQuota || annualAdmissionQuota();
   const programs = getPrograms();
   const programCount = Math.max(1, programs.length);
   const ratio = state.resources.students / Math.max(1, state.resources.faculty);
-  const loadPenalty = Math.max(0, total - state.resources.capacity * 0.76) / Math.max(300, state.resources.capacity);
+  const loadPenalty = Math.max(0, total - quota) / Math.max(1, quota);
   const ratioPenalty = Math.max(0, ratio - 22) * 0.008;
   return clamp(
     0.48 +
@@ -225,16 +305,31 @@ function planTotal() {
 
 function getPrograms() {
   return (state?.colleges || []).flatMap((college) =>
-    college.disciplines.flatMap((discipline) =>
-      discipline.programs.map((program) => ({
-        ...program,
-        collegeId: college.id,
-        collegeName: college.name,
-        discipline: discipline.name,
-        category: college.category,
-      })),
-    ),
+    (college.programs || []).map((program) => ({
+      ...program,
+      collegeId: college.id,
+      collegeName: college.name,
+      category: college.category,
+    })),
   );
+}
+
+function annualAdmissionQuota() {
+  if (!state) return 0;
+  return Math.max(0, Math.round(state.resources.capacity / 4));
+}
+
+function redistributeAdmissionDraft() {
+  const programs = getPrograms();
+  const quota = annualAdmissionQuota();
+  state.admissions.annualQuota = quota;
+  state.admissions.draft = {};
+  if (!programs.length) return;
+  const base = Math.floor(quota / programs.length);
+  let remainder = quota - base * programs.length;
+  programs.forEach((program, index) => {
+    state.admissions.draft[program.id] = base + (index < remainder ? 1 : 0);
+  });
 }
 
 function currentAction() {
@@ -325,14 +420,18 @@ function renderLanding() {
           <div class="start-kicker">2026 · 四川办学试点</div>
           <h1><span>从一纸合同开始，</span><span>办一所<em>真正被人记住</em></span><span>的大学。</span></h1>
           <p>
-            你将从一所民办专科起步，决定开设什么专业、招多少学生、聘任怎样的人，
+            你将从一所民办本科起步，决定开设什么专业、招多少学生、聘任怎样的人，
             并在一届届毕业生的去向中，留下这所学校的名字。
           </p>
           <div class="start-points">
-            <div class="start-point"><strong>院系生长</strong><span>学院 · 一级学科 · 专业</span></div>
+            <div class="start-point"><strong>学院生长</strong><span>十所学院 · 各自专业</span></div>
             <div class="start-point"><strong>真实规则</strong><span>审批 · 招生 · 学位点</span></div>
             <div class="start-point"><strong>长期主义</strong><span>从省内榜单走向世界</span></div>
           </div>
+          <details class="start-changelog">
+            <summary>本次更新内容</summary>
+            <ul>${CHANGELOG.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          </details>
         </section>
 
         <section class="contract-wrap" aria-label="办学合同">
@@ -340,7 +439,7 @@ function renderLanding() {
           <div class="contract-paper">
             <header class="contract-head">
               <div class="contract-docket">QH-EDU / AGREEMENT / 2026-01</div>
-              <h2>民办高等职业学校设立协议</h2>
+              <h2>民办普通本科学校设立协议</h2>
               <p>甲方：四川省教育厅（模拟）　乙方：拟设学校举办者</p>
             </header>
 
@@ -366,7 +465,7 @@ function renderLanding() {
                   </div>
                   <div class="field">
                     <label for="level">初始办学层次</label>
-                    <input class="input" id="level" value="专科（三年制）" disabled />
+                    <input class="input" id="level" value="本科（四年制）" disabled />
                   </div>
                 </div>
 
@@ -414,6 +513,7 @@ function renderLanding() {
           </div>
         </section>
       </div>
+      <div class="start-version">v${APP_VERSION}</div>
     </main>
   `;
 
@@ -446,14 +546,14 @@ function startNewGame(formData) {
 function createInitialState({ name, nature, difficulty }) {
   const year = 2026;
   return {
-    version: 1,
+    version: 2,
     createdAt: Date.now(),
     difficulty: difficulty.id,
     school: {
       name,
       shortName: name.length > 8 ? name.slice(0, 8) : name,
       nature,
-      level: "专科",
+      level: "本科",
       province: "四川省",
       city: "成都市",
       founded: year,
@@ -467,11 +567,11 @@ function createInitialState({ name, nature, difficulty }) {
     },
     resources: {
       cash: difficulty.cash,
-      reputation: nature === "public" ? 42 : 34,
-      quality: 36,
-      research: 14,
-      satisfaction: 66,
-      employment: 68,
+      reputation: nature === "public" ? 16 : 10,
+      quality: 13,
+      research: 6,
+      satisfaction: 30,
+      employment: 28,
       faculty: 32,
       students: 0,
       capacity: 1200,
@@ -481,6 +581,7 @@ function createInitialState({ name, nature, difficulty }) {
     colleges: [],
     admissions: {
       draft: {},
+      annualQuota: 300,
       planStatus: "not_started",
       approvedTotal: 0,
       campaignDone: false,
@@ -533,6 +634,12 @@ function createInitialState({ name, nature, difficulty }) {
     },
     news: [],
     history: [],
+    rank: {
+      provincial: 41,
+      national: 1000,
+      world: 9200,
+      strength: 15,
+    },
     lastAnnualReport: null,
     flags: {
       firstCollege: false,
@@ -860,72 +967,70 @@ function renderAcademic() {
     ${pageHead(
       "ACADEMIC ARCHITECTURE",
       "学院与学科",
-      "按“二级学院 → 一级学科 → 专业”组织培养体系。每新增一个专业，都会增加师资与教学管理成本。",
+      "按“学院 → 专业”组织培养体系。每所学院只能开设自己名下的专业。",
       `
-        <button class="btn btn-outline btn-sm" type="button" data-action="open-add-program" ${programs.length ? "" : "disabled"}>新增学科 / 专业</button>
         <button class="btn btn-dark btn-sm" type="button" data-action="open-add-college">申报新学院</button>
       `,
     )}
 
     ${
-      !programs.length
+      !state.colleges.length
         ? `<div class="empty-state">
             <div>
               <div class="empty-icon">院</div>
               <h3>还没有一个可以招生的学院</h3>
-              <p>六个建校方向各有不同的专业基础与就业优势。选定后仍可继续扩展学科，但第一学院会决定你最早积累的能力。</p>
+              <p>十所学院各有固定的专业方向。选定后仍可继续申报其他学院，但第一学院会决定你最早积累的能力。</p>
               <button class="btn btn-primary" type="button" data-action="open-initial-college">建立首个学院</button>
             </div>
           </div>`
-        : `
-          <div class="metric-grid">
-            ${metricCard("二级学院", `${state.colleges.length}<small>个</small>`, "院", "", "组织结构", "由你持续扩展", "var(--teal-soft)", "var(--green)")}
-            ${metricCard("开设专业", `${programs.length}<small>个</small>`, "专", "", "专业布局", "一级学科与专业双向生长", "var(--blue-soft)", "var(--blue)")}
-            ${metricCard("生师比", `${state.resources.faculty ? (totalStudents / state.resources.faculty).toFixed(1) : "0.0"}<small>:1</small>`, "比", "", totalStudents > state.resources.faculty * 24 ? "师资偏紧" : "师资结构健康", "建议不高于 22:1", "var(--amber-soft)", "var(--amber)")}
-            ${metricCard("办学质量", `${state.resources.quality}<small>/ 100</small>`, "质", "", "人才培养", "影响审批和招生", "var(--violet-soft)", "var(--violet)")}
-          </div>
-
-          <div class="college-list">
-            ${state.colleges
-              .map(
-                (college) => `
-                  <section class="college-card">
-                    <div class="college-banner">
-                      <div class="college-mark">${escapeHtml(college.icon)}</div>
-                      <div class="college-title">
-                        <h3>${escapeHtml(college.name)}</h3>
-                        <p>${escapeHtml(college.category)} · ${college.disciplines.length} 个一级学科 · ${college.disciplines.reduce((sum, item) => sum + item.programs.length, 0)} 个专业</p>
-                      </div>
-                      <span class="badge">${escapeHtml(college.code)}</span>
-                    </div>
-                    <div class="college-body">
-                      ${college.disciplines
-                        .map(
-                          (discipline) => `
-                            <div class="discipline-block">
-                              <div class="discipline-top">
-                                <strong>${escapeHtml(discipline.name)}</strong>
-                                <span class="badge">${discipline.programs.length} 个专业</span>
-                              </div>
-                              <div class="program-list">
-                                ${discipline.programs.map((program) => `<span class="program-chip">${escapeHtml(program.name)}</span>`).join("")}
-                              </div>
-                            </div>
-                          `,
-                        )
-                        .join("")}
-                    </div>
-                    <div class="college-actions">
-                      <button class="btn btn-outline btn-sm" type="button" data-action="open-add-program" data-college-id="${college.id}">新增学科 / 专业</button>
-                      <button class="btn btn-ghost btn-sm" type="button" data-action="navigate" data-view="admissions">制定招生计划</button>
-                    </div>
-                  </section>
-                `,
-              )
-              .join("")}
-          </div>
-        `
+        : ""
     }
+
+    <div class="metric-grid">
+      ${metricCard("已设学院", `${state.colleges.length}<small>/ 10</small>`, "院", "", "组织结构", "十所学院可逐步设立", "var(--teal-soft)", "var(--green)")}
+      ${metricCard("开设专业", `${programs.length}<small>个</small>`, "专", "", "专业布局", "专业直接归属学院", "var(--blue-soft)", "var(--blue)")}
+      ${metricCard("生师比", `${state.resources.faculty ? (totalStudents / state.resources.faculty).toFixed(1) : "0.0"}<small>:1</small>`, "比", "", totalStudents > state.resources.faculty * 24 ? "师资偏紧" : "师资结构健康", "建议不高于 22:1", "var(--amber-soft)", "var(--amber)")}
+      ${metricCard("办学质量", `${state.resources.quality}<small>/ 100</small>`, "质", "", "人才培养", "影响审批和招生", "var(--violet-soft)", "var(--violet)")}
+    </div>
+
+    <div class="college-list">
+      ${COLLEGE_TEMPLATES.map((template) => {
+        const college = state.colleges.find((item) => item.id === template.id);
+        const openedPrograms = college?.programs || [];
+        const remaining = template.programs.filter((name) => !openedPrograms.some((program) => program.name === name));
+        return `
+          <section class="college-card">
+            <div class="college-banner">
+              <div class="college-mark">${escapeHtml(template.icon)}</div>
+              <div class="college-title">
+                <h3>${escapeHtml(template.name)}</h3>
+                <p>${escapeHtml(template.category)} · 可设专业 ${template.programs.length} 个${college ? ` · 已开设 ${openedPrograms.length} 个` : ""}</p>
+              </div>
+              <span class="badge">${college ? "已设立" : "未设立"}</span>
+            </div>
+            <div class="college-body">
+              ${
+                college
+                  ? openedPrograms.length
+                    ? `<div class="program-list">${openedPrograms.map((program) => `<span class="program-chip">${escapeHtml(program.name)}</span>`).join("")}</div>`
+                    : `<p class="muted small">学院已设立，尚未开设专业。</p>`
+                  : `<p class="muted small">${escapeHtml(template.summary)}</p>`
+              }
+            </div>
+            <div class="college-actions">
+              ${
+                college
+                  ? remaining.length
+                    ? `<button class="btn btn-outline btn-sm" type="button" data-action="open-add-program" data-college-id="${college.id}">新增专业 · ${remaining.length} 个可选</button>`
+                    : `<span class="badge">专业已全部开设</span>`
+                  : `<button class="btn btn-outline btn-sm" type="button" data-action="choose-college" data-id="${template.id}" data-initial="false">申报设立</button>`
+              }
+              ${college ? `<button class="btn btn-ghost btn-sm" type="button" data-action="navigate" data-view="admissions">制定招生计划</button>` : ""}
+            </div>
+          </section>
+        `;
+      }).join("")}
+    </div>
 
     ${
       programs.length
@@ -936,7 +1041,7 @@ function renderAcademic() {
             </div>
             <div class="panel-body flush" style="overflow-x:auto">
               <table class="program-table">
-                <thead><tr><th>专业</th><th>所属学院</th><th>一级学科</th><th>专业代码</th><th>培养方向</th></tr></thead>
+                <thead><tr><th>专业</th><th>所属学院</th><th>专业代码</th><th>培养方向</th></tr></thead>
                 <tbody>
                   ${programs
                     .map(
@@ -944,7 +1049,6 @@ function renderAcademic() {
                         <tr>
                           <td><span class="table-title">${escapeHtml(program.name)}</span><span class="table-sub">校级备案专业</span></td>
                           <td>${escapeHtml(program.collegeName)}</td>
-                          <td>${escapeHtml(program.discipline)}</td>
                           <td class="mono">${escapeHtml(program.code)}</td>
                           <td><span class="badge">技术技能型</span></td>
                         </tr>
@@ -970,6 +1074,7 @@ function renderAdmissions() {
   }
 
   const total = planTotal();
+  const quota = state.admissions.annualQuota || annualAdmissionQuota();
   const status = state.admissions.planStatus;
   const probability = approxApprovalChance();
   const result = state.admissions.lastResult;
@@ -1012,8 +1117,8 @@ function renderAdmissions() {
     <div class="admission-layout">
       <section class="panel">
         <div class="panel-head">
-          <div><h3>${state.admissions.campaignDone ? "本年度计划执行情况" : "年度分校分专业招生计划"}</h3><p>${state.admissions.campaignDone ? "下一学年可重新制定计划" : "上报总人数不得超过培养容量与师资承载能力"}</p></div>
-          <span class="badge">${formatNumber(total)} / ${formatNumber(state.resources.capacity)} 人</span>
+          <div><h3>${state.admissions.campaignDone ? "本年度计划执行情况" : "年度分校分专业招生计划"}</h3><p>${state.admissions.campaignDone ? "下一学年可重新制定计划" : `本年度新生配额 ${formatNumber(quota)} 人，按总培养容量分四年自动分配`}</p></div>
+          <span class="badge">${formatNumber(total)} / ${formatNumber(quota)} 人</span>
         </div>
         <div class="panel-body">
           ${
@@ -1028,7 +1133,7 @@ function renderAdmissions() {
                 const disabled = status === "approved" || state.admissions.campaignDone;
                 return `
                   <div class="plan-row">
-                    <div class="plan-program"><strong>${escapeHtml(program.name)}</strong><span>${escapeHtml(program.collegeName)} · ${escapeHtml(program.discipline)}</span></div>
+                    <div class="plan-program"><strong>${escapeHtml(program.name)}</strong><span>${escapeHtml(program.collegeName)} · ${escapeHtml(program.category)}</span></div>
                     <div class="stepper">
                       <button type="button" data-action="adjust-plan" data-program="${program.id}" data-delta="-10" ${disabled ? "disabled" : ""}>−</button>
                       <input type="number" min="0" max="500" step="10" value="${value}" data-plan-input="${program.id}" aria-label="${escapeHtml(program.name)}计划人数" ${disabled ? "disabled" : ""} />
@@ -1041,8 +1146,8 @@ function renderAdmissions() {
               .join("")}
           </div>
           <div class="progress-block" style="margin-top:16px">
-            <div class="progress-info"><span>计划容量使用率</span><strong>${((total / Math.max(1, state.resources.capacity)) * 100).toFixed(1)}%</strong></div>
-            <div class="progress-track"><div class="progress-fill" style="width:${clamp((total / Math.max(1, state.resources.capacity)) * 100, 0, 100)}%"></div></div>
+            <div class="progress-info"><span>新生配额使用率</span><strong>${((total / Math.max(1, quota)) * 100).toFixed(1)}%</strong></div>
+            <div class="progress-track"><div class="progress-fill" style="width:${clamp((total / Math.max(1, quota)) * 100, 0, 100)}%"></div></div>
           </div>
           <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:17px">
             ${
@@ -1065,7 +1170,10 @@ function renderAdmissions() {
               <div><strong>预计通过概率</strong><p>达到建议容量、师资配比健康时，审批会更顺利。最终结果存在有限随机性。</p></div>
             </div>
             <div class="check-list">
-              <div class="check-row"><span>培养容量</span><strong>${formatNumber(state.resources.capacity)} 人</strong></div>
+              <div class="check-row"><span>培养总容量</span><strong>${formatNumber(state.resources.capacity)} 人</strong></div>
+              <div class="check-row"><span>本年度新生配额</span><strong>${formatNumber(quota)} 人</strong></div>
+              <div class="check-row"><span>预计稳定在校规模</span><strong>${formatNumber(quota * 4)} 人</strong></div>
+              <div class="check-row"><span>当前剩余容量</span><strong>${formatNumber(Math.max(0, state.resources.capacity - state.resources.students))} 人</strong></div>
               <div class="check-row"><span>师资承载</span><strong>${ratio > 24 ? "偏紧" : "正常"}</strong></div>
               <div class="check-row"><span>专业均计划</span><strong>${Math.round(total / programs.length)} 人</strong></div>
               <div class="check-row"><span>办学质量</span><strong>${state.resources.quality} / 100</strong></div>
@@ -1149,10 +1257,10 @@ function renderGovernance() {
           <div class="panel-head"><div><h3>学校章程与办学履历</h3><p>变化会自动写入官网</p></div></div>
           <div class="panel-body">
             <div class="timeline">
-              <div class="timeline-item"><span>${state.school.founded}.09</span><strong>学校获批筹建</strong><p>办学性质：${schoolNatureLabel()}；起点层次：专科。</p></div>
+              <div class="timeline-item"><span>${state.school.founded}.09</span><strong>学校获批筹建</strong><p>办学性质：${schoolNatureLabel()}；起点层次：本科。</p></div>
               ${
                 state.colleges.length
-                  ? `<div class="timeline-item"><span>${state.school.founded}.10</span><strong>${escapeHtml(state.colleges[0].name)}揭牌</strong><p>首批设置 ${state.colleges[0].disciplines.reduce((sum, item) => sum + item.programs.length, 0)} 个专业。</p></div>`
+                  ? `<div class="timeline-item"><span>${state.school.founded}.10</span><strong>${escapeHtml(state.colleges[0].name)}揭牌</strong><p>首批设置 ${state.colleges[0].programs.length} 个专业。</p></div>`
                   : ""
               }
               ${
@@ -1250,7 +1358,7 @@ function requirementRow(label, current, required, unit) {
 
 function renderResearch() {
   const projects = state.research.projects || [];
-  const masterReady = state.school.level === "职业本科";
+  const masterReady = state.school.level === "本科";
   const doctorReady = state.school.level === "专业硕士授权";
   return `
     ${pageHead(
@@ -1299,11 +1407,11 @@ function renderResearch() {
 
       <aside class="stack">
         <section class="panel">
-          <div class="panel-head"><div><h3>学位点建设</h3><p>从职业本科走向研究生教育</p></div></div>
+          <div class="panel-head"><div><h3>学位点建设</h3><p>从本科走向研究生教育</p></div></div>
           <div class="panel-body">
             <div class="project-item" style="margin-bottom:9px">
               <div class="project-icon">硕</div>
-              <div class="project-copy"><strong>专业硕士学位点</strong><span>${masterReady ? "当前可提交申请" : "需先升格为职业本科"}</span></div>
+              <div class="project-copy"><strong>专业硕士学位点</strong><span>${masterReady ? "当前可提交申请" : "需先达到本科层次"}</span></div>
               <button class="btn btn-sm ${masterReady ? "btn-outline" : "btn-ghost"}" type="button" data-action="apply-degree" data-degree="master">申请</button>
             </div>
             <div class="project-item">
@@ -1561,7 +1669,7 @@ function renderAlumni() {
             <div class="info-box"><span>年度捐赠</span><strong>${formatMoney(Math.round(state.resources.alumni * 0.018))}</strong></div>
             <div class="info-box"><span>校友活动</span><strong>${canHold ? "可举办" : "待解锁"}</strong></div>
           </div>
-          <div class="notice" style="margin-top:14px"><span class="notice-icon">友</span><span>首届学生按三年制培养，毕业结算后进入校友网络。校友越多，返校日可募集的发展基金越高。</span></div>
+          <div class="notice" style="margin-top:14px"><span class="notice-icon">友</span><span>学生按四年制培养，毕业结算后进入校友网络。校友越多，返校日可募集的发展基金越高。</span></div>
           <button class="btn btn-dark" style="margin-top:15px" data-action="hold-alumni-day" ${canHold ? "" : "disabled"}>举办校友返校日</button>
         </div>
       </section>
@@ -1569,7 +1677,7 @@ function renderAlumni() {
         <div class="panel-head"><div><h3>校友记忆</h3><p>学校的长期资产</p></div></div>
         <div class="panel-body">
           <div class="timeline">
-            ${state.history.length ? state.history.slice(0, 5).map((item) => `<div class="timeline-item"><span>${item.year}</span><strong>第 ${item.year - state.school.founded + 1} 届学生成长记录</strong><p>当年在校 ${formatNumber(item.students)} 人，新增校友 ${formatNumber(item.graduates)} 人。</p></div>`).join("") : `<div class="timeline-item"><span>尚未毕业</span><strong>第一批校友正在路上</strong><p>完成三年培养后，第一届学生将回到学校。</p></div>`}
+            ${state.history.length ? state.history.slice(0, 5).map((item) => `<div class="timeline-item"><span>${item.year}</span><strong>第 ${item.year - state.school.founded + 1} 届学生成长记录</strong><p>当年在校 ${formatNumber(item.students)} 人，新增校友 ${formatNumber(item.graduates)} 人。</p></div>`).join("") : `<div class="timeline-item"><span>尚未毕业</span><strong>第一批校友正在路上</strong><p>完成四年培养后，第一届学生将回到学校。</p></div>`}
           </div>
         </div>
       </aside>
@@ -1602,11 +1710,29 @@ function renderRankings(ranks) {
     title = "四川省高校综合榜";
     subtitle = "四川高校真实校名 + 模拟办学表现，本校会自动插入榜单";
   } else if (ui.rankingTab === "national") {
-    rows = NATIONAL_UNIVERSITIES.map((item) => ({ ...item }));
+    rows = [
+      ...NATIONAL_UNIVERSITIES.map((item) => ({ ...item })),
+      {
+        name: state.school.name,
+        city: state.school.city,
+        score: schoolStrength(),
+        rank: ranks.national,
+        you: true,
+      },
+    ];
     title = "中国大学综合榜 · 前 100";
     subtitle = "使用真实高校名称与模拟评价分数；本校未进入前 100 时显示预估全国位次";
   } else {
-    rows = WORLD_UNIVERSITIES.map((item) => ({ ...item }));
+    rows = [
+      ...WORLD_UNIVERSITIES.map((item) => ({ ...item })),
+      {
+        name: state.school.name,
+        country: "中国",
+        score: schoolStrength(),
+        rank: ranks.world,
+        you: true,
+      },
+    ];
     title = "世界大学综合榜";
     subtitle = "世界名校名称 + 模拟评价维度，本校以预估世界位次呈现";
   }
@@ -1765,7 +1891,6 @@ function renderModal() {
       </section>
     </div>
   `;
-  if (ui.modal.type === "add-program") initAddProgramSelects();
 }
 
 function modalHeader(title, subtitle, close = true) {
@@ -1812,7 +1937,7 @@ function modalTutorial() {
       <div class="tutorial-head">
         <small>${escapeHtml(step.kicker)}</small>
         <h2>办校第一课</h2>
-        <p>从民办专科到一所被记住的大学</p>
+        <p>从民办本科到一所被记住的大学</p>
       </div>
       <div class="tutorial-body">
         <div class="tutorial-progress">${TUTORIAL_STEPS.map((_, i) => `<i class="${i <= index ? "active" : ""}"></i>`).join("")}</div>
@@ -1842,6 +1967,11 @@ function modalSaveMenu() {
           <div class="person-copy"><strong>${escapeHtml(state.school.name)}</strong><span>${state.time.year} 学年 · 第 ${state.history.length + 1} 个经营年度</span></div>
           <span class="status-pill status-success">自动保存</span>
         </div>
+        <div class="notice" style="margin-bottom:12px"><span class="notice-icon">版</span><span>当前版本 v${APP_VERSION} · 数据仅保存在当前浏览器本地。</span></div>
+        <details class="start-changelog" style="margin-bottom:12px">
+          <summary>本次更新内容</summary>
+          <ul>${CHANGELOG.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        </details>
         <div class="form-grid">
           <button class="btn btn-outline" type="button" data-action="export-save">导出存档</button>
           <button class="btn btn-outline" type="button" data-action="return-title">返回标题页</button>
@@ -1861,7 +1991,7 @@ function modalCollegeChoice(initial) {
     size: "wide",
     html: `
       ${modalHeader(
-        initial ? "选择首所二级学院" : "申报新的二级学院",
+        initial ? "选择首所学院" : "申报新学院",
         initial ? "学院方向会决定首批专业和早期资源优势" : `设立投入 ${cost} 万元，需具备足够资金与办学基础`,
       )}
       <div class="modal-body">
@@ -1875,15 +2005,15 @@ function modalCollegeChoice(initial) {
                         <span class="choice-icon">${escapeHtml(item.icon)}</span>
                         <strong>${escapeHtml(item.name)}</strong>
                         <p>${escapeHtml(item.summary)}</p>
-                        <span class="card-foot"><span>${escapeHtml(item.discipline)} · ${item.programs.length} 个专业</span><span>${cost} 万</span></span>
+                        <span class="card-foot"><span>可设 ${item.programs.length} 个专业</span><span>${cost} 万</span></span>
                       </button>
                     `,
                   )
                   .join("")}
               </div>`
-            : `<div class="empty-state"><div><div class="empty-icon">全</div><h3>六个学院方向均已设立</h3><p>目前版本已覆盖全部学院模板，可继续增加专业与学科。</p></div></div>`
+            : `<div class="empty-state"><div><div class="empty-icon">全</div><h3>十所学院均已设立</h3><p>目前版本已覆盖全部学院模板，可继续为各学院增加专业。</p></div></div>`
         }
-        <div class="notice" style="margin-top:15px"><span class="notice-icon">i</span><span>首所学院同时配置 ${initial ? 12 : 8} 名专任教师。点击学院后会立即扣除建设投入。</span></div>
+        <div class="notice" style="margin-top:15px"><span class="notice-icon">i</span><span>首所学院自动开设前三个专业，后续新学院先设立再逐个开设专业。点击后立即扣除建设投入。</span></div>
       </div>
     `,
   };
@@ -1892,41 +2022,40 @@ function modalCollegeChoice(initial) {
 function modalAddProgram(ctx) {
   const colleges = state.colleges;
   if (!colleges.length) return modalCollegeChoice(true);
-  const selectedCollege = ctx.collegeId || colleges[0].id;
-  const categories = ACADEMIC_CATALOG.map((item) => item.category);
+  const college = state.colleges.find((item) => item.id === ctx.collegeId) || colleges[0];
+  const template = COLLEGE_TEMPLATES.find((item) => item.id === college.id);
+  const openedNames = new Set(college.programs.map((program) => program.name));
+  const remaining = (template?.programs || []).filter((name) => !openedNames.has(name));
+  if (!remaining.length) {
+    return {
+      size: "narrow",
+      html: `
+        ${modalHeader("专业已全部开设", `${college.name}的固定专业池已经用完`)}
+        <div class="modal-body">
+          <div class="empty-state"><div><div class="empty-icon">专</div><h3>无可新增专业</h3><p>该学院名下专业已经全部开设，可以继续申报其他学院。</p></div></div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-dark" type="button" data-action="close-modal">知道了</button></div>
+      `,
+    };
+  }
   return {
-    size: "wide",
+    size: "narrow",
     html: `
-      ${modalHeader("新增一级学科与专业", "费用 120 万元。若一级学科已存在，会直接增加专业")}
+      ${modalHeader("新增专业", `${college.name} · 建设投入 120 万元`)}
       <form id="add-program-form">
         <div class="modal-body">
-          <div class="form-grid">
-            <div class="field span-2">
-              <label>所属二级学院</label>
-              <select class="select" name="collegeId" required>
-                ${colleges.map((college) => `<option value="${college.id}" ${selectedCollege === college.id ? "selected" : ""}>${escapeHtml(college.name)}</option>`).join("")}
-              </select>
-            </div>
-            <div class="field">
-              <label>学科门类 / 专业大类</label>
-              <select class="select" name="category" data-program-category>
-                ${categories.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join("")}
-              </select>
-            </div>
-            <div class="field">
-              <label>一级学科</label>
-              <select class="select" name="discipline" data-program-discipline></select>
-            </div>
-            <div class="field span-2">
-              <label>专业</label>
-              <select class="select" name="major" data-program-major></select>
-            </div>
+          <input type="hidden" name="collegeId" value="${college.id}" />
+          <div class="field">
+            <label>专业</label>
+            <select class="select" name="major" required>
+              ${remaining.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
+            </select>
           </div>
-          <div class="modal-callout info" style="margin:15px 0 0">该目录覆盖常见高职专业，并非完整教育部专业目录；后续可继续扩充数据文件。</div>
+          <div class="modal-callout info" style="margin:15px 0 0">只能开设本学院固定专业池内的专业，不再允许跨学院选择。</div>
         </div>
         <div class="modal-foot">
           <button class="btn btn-ghost" type="button" data-action="close-modal">取消</button>
-          <button class="btn btn-primary" type="submit">建设学科 · 120 万</button>
+          <button class="btn btn-primary" type="submit">开设专业 · 120 万</button>
         </div>
       </form>
     `,
@@ -2183,7 +2312,7 @@ function modalDegree(degree) {
   const isMaster = degree === "master";
   const requirements = isMaster
     ? [
-        ["办学层次", state.school.level === "职业本科", "职业本科"],
+        ["办学层次", state.school.level === "本科", "本科"],
         ["科研水平", state.resources.research >= 50, "≥ 50"],
         ["办学质量", state.resources.quality >= 65, "≥ 65"],
         ["在校学生", state.resources.students >= 2500, "≥ 2,500"],
@@ -2432,27 +2561,6 @@ function modalUpgradeResult(ctx) {
       <div class="modal-foot"><button class="btn btn-primary" type="button" data-action="close-modal">知道了</button></div>
     `,
   };
-}
-
-function initAddProgramSelects() {
-  const form = document.querySelector("#add-program-form");
-  if (!form) return;
-  const categorySelect = form.querySelector("[data-program-category]");
-  const disciplineSelect = form.querySelector("[data-program-discipline]");
-  const majorSelect = form.querySelector("[data-program-major]");
-  const refreshDisciplines = () => {
-    const category = ACADEMIC_CATALOG.find((item) => item.category === categorySelect.value) || ACADEMIC_CATALOG[0];
-    disciplineSelect.innerHTML = category.disciplines.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join("");
-    refreshMajors();
-  };
-  const refreshMajors = () => {
-    const category = ACADEMIC_CATALOG.find((item) => item.category === categorySelect.value) || ACADEMIC_CATALOG[0];
-    const discipline = category.disciplines.find((item) => item.name === disciplineSelect.value) || category.disciplines[0];
-    majorSelect.innerHTML = discipline.majors.map((major) => `<option value="${escapeHtml(major)}">${escapeHtml(major)}</option>`).join("");
-  };
-  categorySelect.onchange = refreshDisciplines;
-  disciplineSelect.onchange = refreshMajors;
-  refreshDisciplines();
 }
 
 function handleClick(event) {
@@ -2736,7 +2844,7 @@ function resetGame() {
   ui.modal = null;
   ui.view = "dashboard";
   ui.startForm = {
-    name: "青禾职业技术学院",
+    name: "青禾学院",
     difficulty: "steady",
     nature: "private",
     province: "四川省",
@@ -2761,11 +2869,11 @@ function chooseCollege(templateId, initial) {
   state.resources.cash -= cost;
   state.resources.faculty += initial ? 12 : 8;
   state.resources.quality += 1;
-  const programs = template.programs.map((name, index) => ({
+  const initialPrograms = initial ? template.programs.slice(0, 3) : [];
+  const programs = initialPrograms.map((name, index) => ({
     id: `${template.id}-${index + 1}`,
     name,
-    code: `${template.id === "health" ? "520" : "510"}${String(201 + index * 3).padStart(3, "0")}`,
-    basePlan: 120,
+    code: `${template.id === "medicine" ? "520" : "510"}${String(201 + index * 3).padStart(3, "0")}`,
   }));
   state.colleges.push({
     id: template.id,
@@ -2775,12 +2883,7 @@ function chooseCollege(templateId, initial) {
     icon: template.icon,
     accent: template.accent,
     summary: template.summary,
-    disciplines: [{ name: template.discipline, programs }],
-  });
-  programs.forEach((program) => {
-    if (state.admissions.planStatus !== "approved" && !state.admissions.campaignDone) {
-      state.admissions.draft[program.id] = 120;
-    }
+    programs,
   });
   if (initial) {
     state.flags.firstCollege = true;
@@ -2793,10 +2896,13 @@ function chooseCollege(templateId, initial) {
   } else {
     addNews(
       `${template.name}获准设立`,
-      `学校新增${template.discipline}一级学科，进一步完善专业布局。`,
+      `学校新增${template.name}，下一步可在该学院名下开设对应专业。`,
       "教学科研",
     );
     toast("新学院已设立", `${template.name}进入建设阶段。`, "success");
+  }
+  if (state.admissions.planStatus !== "approved" && !state.admissions.campaignDone) {
+    redistributeAdmissionDraft();
   }
   saveState();
   closeModal();
@@ -2808,11 +2914,9 @@ function chooseCollege(templateId, initial) {
 
 function addProgram(formData) {
   const college = state.colleges.find((item) => item.id === formData.get("collegeId"));
-  const category = String(formData.get("category") || "");
-  const disciplineName = String(formData.get("discipline") || "");
   const majorName = String(formData.get("major") || "");
   if (!college || !majorName) {
-    toast("专业信息不完整", "请选择学院、一级学科与专业。", "error");
+    toast("专业信息不完整", "请选择专业。", "error");
     return;
   }
   if (state.resources.cash < 120) {
@@ -2823,28 +2927,29 @@ function addProgram(formData) {
     toast("该专业已存在", "同一学院不可重复开设同一专业。", "error");
     return;
   }
-  let discipline = college.disciplines.find((item) => item.name === disciplineName);
-  if (!discipline) {
-    discipline = { name: disciplineName, programs: [] };
-    college.disciplines.push(discipline);
+  const template = COLLEGE_TEMPLATES.find((item) => item.id === college.id);
+  if (!template?.programs.includes(majorName)) {
+    toast("专业不属于该学院", "只能开设本学院固定专业池内的专业。", "error");
+    return;
   }
   const program = {
     id: `${college.id}-${Date.now().toString(36)}`,
     name: majorName,
     code: `5${String(10000 + Math.floor(Math.random() * 49999))}`,
-    basePlan: 100,
   };
-  discipline.programs.push(program);
+  college.programs.push(program);
   state.resources.cash -= 120;
   state.resources.quality += 1;
-  state.admissions.draft[program.id] = 100;
   addNews(
     `${majorName}专业获批备案`,
-    `${college.name}新增${category}门类下${disciplineName}专业，纳入下一年度招生规划。`,
+    `${college.name}新增${majorName}专业，纳入学校人才培养体系。`,
     "教学科研",
   );
+  if (state.admissions.planStatus !== "approved" && !state.admissions.campaignDone) {
+    redistributeAdmissionDraft();
+  }
   commit();
-  toast("学科建设完成", `${disciplineName} / ${majorName}已加入培养体系。`, "success");
+  toast("专业开设完成", `${college.name}已新增${majorName}。`, "success");
 }
 
 function adjustPlan(programId, delta) {
@@ -2866,8 +2971,8 @@ function submitAdmissionPlan() {
     toast("计划人数过少", "本年度申报总人数至少为 60 人。", "error");
     return;
   }
-  if (total > state.resources.capacity) {
-    toast("超出培养容量", `当前校园最多承载 ${formatNumber(state.resources.capacity)} 人。`, "error");
+  if (total > (state.admissions.annualQuota || annualAdmissionQuota())) {
+    toast("超出本年度新生配额", `本年度最多可招 ${formatNumber(state.admissions.annualQuota || annualAdmissionQuota())} 名新生。`, "error");
     return;
   }
   const chance = approxApprovalChance();
@@ -3259,7 +3364,7 @@ function registerCompetition(competitionId) {
     return;
   }
   const levelPenalty = { 校级: 0, 省级: 8, 国家级: 18, 国际级: 22, 世界级: 30 }[comp.level] || 0;
-  const minimumSchoolPenalty = comp.requires === "职业本科及以上" && state.school.level === "专科" ? 18 : 0;
+  const minimumSchoolPenalty = comp.requires === "职业本科及以上" && state.school.level === "本科" ? 8 : 0;
   const performance =
     schoolStrength() +
     state.resources.research * 0.13 +
@@ -3359,7 +3464,7 @@ function settleYear() {
   const nextCohorts = [];
   state.admissions.cohorts.forEach((cohort) => {
     const age = year - cohort.year;
-    if (age >= 3) {
+    if (age >= 4) {
       graduated += cohort.size;
       cohortNotes.push(`${cohort.year}级 ${formatNumber(cohort.size)} 人毕业`);
     } else {
@@ -3459,6 +3564,7 @@ function settleYear() {
   state.resources.reputation = clamp(state.resources.reputation + (annualEvent.reputation || 0), 0, 100);
   state.resources.employment = clamp(state.resources.employment + (annualEvent.employment || 0), 0, 100);
 
+  state.rank = computeRawRankings();
   const ranks = getRankings();
   const report = {
     year,
@@ -3507,10 +3613,7 @@ function settleYear() {
   state.admissions.planStatus = "not_started";
   state.admissions.approvedTotal = 0;
   state.admissions.campaignDone = false;
-  state.admissions.draft = {};
-  getPrograms().forEach((program) => {
-    state.admissions.draft[program.id] = 120;
-  });
+  redistributeAdmissionDraft();
   addNews(
     `${state.time.year}年新学期工作部署会召开`,
     "会议围绕人才培养、招生就业、科研平台和校园建设部署新一年重点任务。",
