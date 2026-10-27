@@ -15,8 +15,27 @@ import {
   WORLD_UNIVERSITIES,
 } from "./data.js";
 
-const APP_VERSION = "0.3.2";
+const APP_VERSION = "0.4.0";
 const CHANGELOG = [
+  {
+    version: "v0.4.0",
+    date: "2026-10-27",
+    summary: "玩家校长、校长办公室与拟办签字正式版",
+    items: [
+      "开局合同新增校长姓名，玩家本人担任学校校长",
+      "新增右下角可收起的校长办公室悬浮按钮",
+      "办公室包含校历、教研技能树壳和电脑桌面",
+      "电脑提供学校官网、教育局官网与教务 App 壳",
+      "教育局入口改为独立政务网站页面，不再跳转到普通招生页",
+      "高价值操作改为拟办文件，在办公室最终签字",
+      "建筑施工加入 6/9 个月工期，完工后才生效",
+      "学院卡片显示专业、学生与教师人数",
+      "新手教程适配玩家校长、办公室拟办与签字流程",
+      "教程支持上一步、下一步和直接执行当前步骤",
+      "办公室校历改为可翻月的七列日历，并为手机端适配",
+      "学校和教育局官网在办公室电脑窗口中独立展示",
+    ],
+  },
   {
     version: "v0.3.2",
     date: "2026-10-27",
@@ -131,44 +150,56 @@ const NAV_ITEMS = [
 
 const TUTORIAL_STEPS = [
   {
-    kicker: "01 / 建校",
-    title: "先建立一个学院",
-    body: "大学不是一次点满的技能树。你的第一所学院会决定首批专业、师资结构和校企资源。进入“学院与学科”，从十所学院方向中选择其一。",
-    action: "去建立学院",
+    kicker: "01 / 校长身份",
+    title: "你是这所学校的校长",
+    body: "开局合同上的姓名就是玩家本人。你负责学校发展方向、资金、人事和最终签字，旧版 NPC 校长仅作为彩蛋保留。",
+    action: "进入校务总览",
+    view: "dashboard",
+    art: "校",
+  },
+  {
+    kicker: "02 / 校长办公室",
+    title: "所有重大决定都要签字",
+    body: "右下角的“校长办公室”会在每个页面出现。学院、专业、师资、建设、科研等操作先生成拟办文件，进入办公室后才能最终签字。",
+    action: "打开校长办公室",
+    view: "dashboard",
+    office: true,
+    art: "桌",
+  },
+  {
+    kicker: "03 / 建院",
+    title: "先拟建第一所学院",
+    body: "在“学院与学科”选择第一所学院。该操作只生成待签文件，不会立刻扣款或成立学院。",
+    action: "去学院与学科",
     view: "academic",
     art: "院",
   },
   {
-    kicker: "02 / 审批",
-    title: "招生不是想招多少就招多少",
-    body: "先按专业上报年度拟招生人数。教育局会综合办学条件、师资与培养能力审批。批复后才可启动招生投放。",
-    action: "去上报计划",
-    view: "admissions",
-    art: "批",
+    kicker: "04 / 签字",
+    title: "回到办公室完成签字",
+    body: "办公室电脑桌面会显示待签文件、拟花费和签字后的资金结余。签字后建院才正式执行；拒绝则取消提案。",
+    action: "打开待签文件",
+    view: "dashboard",
+    office: true,
+    art: "签",
   },
   {
-    kicker: "03 / 招生",
-    title: "把批下来的计划招满",
-    body: "选择招生策略与覆盖范围。学校声誉、就业质量与投放预算共同决定报到率。录取人数会形成一届真实的学生 cohort，并影响未来四年的收入。",
-    action: "启动招生",
-    view: "admissions",
+    kicker: "05 / 招生",
+    title: "通过教育局官网上报招生",
+    body: "打开办公室电脑里的浏览器，进入教育局招生入口。计划经 10–25 个工作日审核，7 月公布录取，9 月正式入学。",
+    action: "打开办公室浏览器",
+    view: "dashboard",
+    office: true,
+    browser: true,
     art: "招",
   },
   {
-    kicker: "04 / 结算",
-    title: "用年度经营检验决定",
-    body: "时间会自动推进。学年结束后，会结算学费、师资与运营成本，处理自然流失、生成排名变化和新闻。",
-    action: "查看年度工作",
+    kicker: "06 / 自动时间",
+    title: "时间持续推进，通知负责叫停",
+    body: "日期会逐日推进。招生截止、审批结果、开学、军训、毕业和资金事件会弹出通知并自动暂停，可处理、跳过或关闭提醒。",
+    action: "完成教程",
     view: "dashboard",
-    art: "年",
-  },
-  {
-    kicker: "05 / 声誉",
-    title: "一所大学需要被看见",
-    body: "校园官网会自动记录招生、任命、科研与竞赛新闻。后续可通过榜单、科研、赛事和校企合作提高全国与全球声誉。",
-    action: "打开校园官网",
-    view: "website",
-    art: "闻",
+    art: "时",
   },
 ];
 
@@ -179,6 +210,7 @@ const ui = {
   sidebarOpen: false,
   startForm: {
     name: "青禾学院",
+    principalName: "林知远",
     difficulty: "steady",
     nature: "private",
     province: "四川省",
@@ -186,8 +218,13 @@ const ui = {
   rankingTab: "sichuan",
   lifeTab: "clubs",
   financeTab: "bank",
+  officeOpen: false,
+  officeTab: "calendar",
+  computerView: "desktop",
+  calendarYear: null,
+  calendarMonth: null,
   modal: null,
-  tutorialIndex: 0,
+  tutorialIndex: null,
 };
 
 const appRoot = document.querySelector("#app");
@@ -225,6 +262,7 @@ function loadState() {
       parsed.bank = parsed.bank || { demand: 0, fixed: [], loans: [], credit: 100, transactions: [] };
       parsed.stock = parsed.stock || { cash: 0, holdings: {}, realized: 0, prices: Object.fromEntries(STOCK_MARKET.map((item) => [item.symbol, item.basePrice])), transactions: [] };
       parsed.notifications = parsed.notifications || { queue: [], muted: {}, resumedSpeed: 1 };
+      parsed.office = parsed.office || { pending: [], history: [], construction: [] };
       parsed.admissions = normalizeAdmissionsState(parsed.admissions, parsed.time.year);
       parsed.time.month = parsed.time.month || 9;
       parsed.time.day = parsed.time.day || 1;
@@ -289,6 +327,7 @@ function migrateLegacyState(legacy) {
   migrated.bank = migrated.bank || { demand: 0, fixed: [], loans: [], credit: 100, transactions: [] };
   migrated.stock = migrated.stock || { cash: 0, holdings: {}, realized: 0, prices: Object.fromEntries(STOCK_MARKET.map((item) => [item.symbol, item.basePrice])), transactions: [] };
   migrated.notifications = migrated.notifications || { queue: [], muted: {}, resumedSpeed: 1 };
+  migrated.office = migrated.office || { pending: [], history: [], construction: [] };
   migrated.admissions = normalizeAdmissionsState(migrated.admissions, migrated.time.year);
   migrated.time.month = migrated.time.month || 9;
   migrated.time.day = migrated.time.day || 1;
@@ -580,6 +619,16 @@ function getPrograms() {
   );
 }
 
+function collegeStats(college) {
+  const totalPrograms = Math.max(1, getPrograms().length);
+  const share = Math.max(0, college.programs.length) / totalPrograms;
+  return {
+    students: Math.max(0, Math.round(state.resources.students * share)),
+    faculty: Math.max(0, Math.round(state.resources.faculty * share)),
+    perProgram: Math.max(0, Math.round((state.resources.students * share) / Math.max(1, college.programs.length))),
+  };
+}
+
 function annualAdmissionQuota() {
   if (!state) return 0;
   return Math.max(0, Math.round(state.resources.capacity / 4));
@@ -613,12 +662,10 @@ function currentAction() {
 }
 
 function currentTutorialStep() {
-  if (!state?.flags.firstCollege) return 0;
-  if (state.admissions.planStatus === "not_started" || state.admissions.planStatus === "rejected") return 1;
-  if (!state.admissions.campaignDone) return 2;
-  if (!state.history.length) return 3;
-  if (!state.flags.visitedWebsite) return 4;
-  return 4;
+  if (state?.office.pending.length) return 3;
+  if (!state?.flags.firstCollege) return 2;
+  if (["not_started", "rejected"].includes(state.admissions.planStatus)) return 4;
+  return 5;
 }
 
 function addNews(title, summary, category = "学校要闻", dateOverride = null, publicNews = true) {
@@ -736,6 +783,10 @@ function renderLanding() {
                     <label for="school-name">拟设学校名称</label>
                     <input class="input" id="school-name" name="name" maxlength="24" required value="${escapeHtml(ui.startForm.name)}" />
                   </div>
+                  <div class="field span-2">
+                    <label for="principal-name">校长姓名（玩家名）</label>
+                    <input class="input" id="principal-name" name="principalName" maxlength="12" required value="${escapeHtml(ui.startForm.principalName)}" />
+                  </div>
                   <div class="field">
                     <label for="province">办学省份</label>
                     <input class="input" id="province" value="四川省 · 成都市" disabled />
@@ -805,16 +856,22 @@ function startNewGame(formData) {
   const difficulty = DIFFICULTIES.find((item) => item.id === formData.get("difficulty")) || DIFFICULTIES[0];
   const name = String(formData.get("name") || "").trim().slice(0, 24);
   const nature = formData.get("nature") === "public" ? "public" : "private";
+  const principalName = String(formData.get("principalName") || "").trim().slice(0, 12);
   if (name.length < 2) {
     toast("学校名称太短", "至少需要两个汉字或字符。", "error");
     return;
   }
+  if (principalName.length < 2) {
+    toast("校长姓名太短", "请填写至少两个字的校长姓名。", "error");
+    return;
+  }
 
-  state = createInitialState({ name, nature, difficulty });
+  state = createInitialState({ name, nature, difficulty, principalName });
   state.ranking = createRankingSnapshot(state);
   state.calendarMilestones.push(`${state.time.year}-admissions-open`);
   ui.active = true;
   ui.view = "dashboard";
+  ui.tutorialIndex = 0;
   saveState();
   renderApp();
   ui.modal = { type: "tutorial", index: currentTutorialStep() };
@@ -822,7 +879,7 @@ function startNewGame(formData) {
   toast("办学合同已备案", `${name}正式进入筹建期。`);
 }
 
-function createInitialState({ name, nature, difficulty }) {
+function createInitialState({ name, nature, difficulty, principalName }) {
   const year = 2026;
   return {
     version: 5,
@@ -930,9 +987,25 @@ function createInitialState({ name, nature, difficulty }) {
       muted: {},
       resumedSpeed: 1,
     },
+    office: {
+      pending: [],
+      history: [],
+      construction: [],
+    },
     governance: {
-      president: null,
-      interim: true,
+      playerName: principalName,
+      president: {
+        id: "player",
+        name: principalName,
+        title: "校长 · 玩家",
+        salary: 0,
+        quality: 0,
+        research: 0,
+        reputation: 0,
+        trait: "校长",
+        quote: "这是由我签下名字的学校。",
+      },
+      interim: false,
       facultyHires: 0,
       lastInspection: null,
     },
@@ -960,6 +1033,7 @@ function createInitialState({ name, nature, difficulty }) {
 
 function renderApp() {
   if (!state) return;
+  dedupeOfficePending();
   normalizeTimeYear(state);
   if (!state.ranking) state.ranking = createRankingSnapshot(state);
   const ranks = getRankings();
@@ -1034,6 +1108,7 @@ function renderApp() {
         <main class="content">${viewContent}</main>
       </div>
     </div>
+    ${renderOfficeChrome()}
   `;
   document.title = `${state.school.name} · 青禾计划`;
 }
@@ -1054,6 +1129,335 @@ function renderCurrentView(ranks) {
   return (renderers[ui.view] || renderDashboard)(ranks);
 }
 
+function renderOfficeChrome() {
+  if (!state) return "";
+  return `
+    <button class="office-fab ${ui.officeOpen ? "active" : ""}" type="button" data-action="toggle-office" aria-label="校长办公室">
+      <span class="office-fab-icon">桌</span>
+      <span class="office-fab-label">校长办公室</span>
+      ${state.office.pending.length ? `<span class="office-fab-count">${state.office.pending.length}</span>` : ""}
+    </button>
+    ${
+      ui.officeOpen
+        ? `<div class="office-backdrop" data-action="toggle-office"></div>
+           <aside class="office-drawer" aria-label="校长办公室">
+             <header class="office-drawer-head">
+               <div><span class="eyebrow">PRINCIPAL OFFICE</span><h2>校长办公室</h2></div>
+               <button class="icon-btn" type="button" data-action="toggle-office" aria-label="收起">×</button>
+             </header>
+             <div class="office-tabs">
+               ${[["calendar", "校历"], ["research", "教研"], ["computer", "电脑"]].map(([id, label]) => `<button class="office-tab ${ui.officeTab === id ? "active" : ""}" type="button" data-action="office-tab" data-tab="${id}">${label}</button>`).join("")}
+             </div>
+             <div class="office-body">${renderOfficeTab()}</div>
+           </aside>`
+        : ""
+    }
+  `;
+}
+
+function renderOfficeTab() {
+  if (ui.officeTab === "research") return renderOfficeResearch();
+  if (ui.officeTab === "computer") return renderOfficeComputer();
+  return renderOfficeCalendar();
+}
+
+function renderOfficeCalendar() {
+  const viewYear = ui.calendarYear || state.time.year;
+  const viewMonth = ui.calendarMonth || state.time.month;
+  const firstDay = new Date(Date.UTC(viewYear, viewMonth - 1, 1)).getUTCDay();
+  const mondayOffset = (firstDay + 6) % 7;
+  const totalDays = daysInMonth(viewMonth, viewYear);
+  const events = calendarEventsForMonth(viewMonth);
+  const cells = [];
+  for (let i = 0; i < mondayOffset; i += 1) cells.push(null);
+  for (let day = 1; day <= totalDays; day += 1) cells.push(day);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const currentMonthEvents = events.filter((event) => event.month === viewMonth);
+  return `<div class="office-panel office-calendar">
+    <div class="office-panel-head calendar-title-row">
+      <div><strong>${viewYear} 年 ${viewMonth} 月</strong><span>当月完整日历</span></div>
+      <div class="calendar-nav">
+        <button class="icon-btn" type="button" data-action="calendar-move" data-delta="-1" aria-label="上个月">‹</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-action="calendar-today">今天</button>
+        <button class="icon-btn" type="button" data-action="calendar-move" data-delta="1" aria-label="下个月">›</button>
+      </div>
+    </div>
+    <div class="calendar-weekdays">${["一","二","三","四","五","六","日"].map((day) => `<span>${day}</span>`).join("")}</div>
+    <div class="calendar-grid">
+      ${cells.map((day) => {
+        if (!day) return `<div class="calendar-day empty"></div>`;
+        const isToday = viewYear === state.time.year && viewMonth === state.time.month && day === state.time.day;
+        const dayEvents = events.filter((event) => event.day === day);
+        return `<div class="calendar-day ${isToday ? "today" : ""} ${dayEvents.length ? "has-event" : ""}">
+          <span class="calendar-number">${day}</span>
+          ${dayEvents.map((event) => `<small>${escapeHtml(event.short)}</small>`).join("")}
+        </div>`;
+      }).join("")}
+    </div>
+    <div class="calendar-event-list">
+      <div class="bureau-card-head"><span>历</span><div><strong>本月节点</strong><small>${currentMonthEvents.length} 项</small></div></div>
+      ${currentMonthEvents.length ? currentMonthEvents.map((event) => `<div class="calendar-event-row"><strong>${String(event.day).padStart(2,"0")} 日</strong><span>${escapeHtml(event.name)}</span></div>`).join("") : `<p class="muted small">本月暂无固定校历事件。</p>`}
+    </div>
+  </div>`;
+}
+
+function calendarEventsForMonth(month) {
+  const events = [
+    { month: 1, day: 1, name: "招生计划申报开放", short: "招生开放" },
+    { month: 1, day: 20, name: "寒假开始", short: "寒假" },
+    { month: 3, day: 1, name: "春季学期开学", short: "开学" },
+    { month: 4, day: 20, name: "招生截止提醒", short: "截止提醒" },
+    { month: 4, day: 30, name: "招生计划申报截止", short: "招生截止" },
+    { month: 6, day: 1, name: "毕业季", short: "毕业" },
+    { month: 7, day: 1, name: "录取结果公布", short: "录取" },
+    { month: 9, day: 1, name: "新生入学与新学年", short: "开学" },
+    { month: 10, day: 1, name: "新生军训", short: "军训" },
+  ];
+  return events.filter((event) => event.month === month);
+}
+
+function renderOfficeResearch() {
+  const nodes = ["师资培养", "科研平台", "产教融合", "学位建设", "国际交流"];
+  return `<div class="office-panel"><div class="office-panel-head"><strong>教研技能树</strong><span>本版本为功能壳</span></div>
+    <div class="office-tree">${nodes.map((name, index) => `<div class="office-tree-node"><span>${index + 1}</span><strong>${name}</strong><small>后续开放</small></div>`).join("")}</div>
+    <div class="notice" style="margin-top:12px"><span class="notice-icon">树</span><span>后续通过教研解锁对应教学、科研与产教功能。</span></div></div>`;
+}
+
+function renderOfficeComputer() {
+  if (ui.computerView === "browser") return renderOfficeBrowser();
+  if (ui.computerView === "school-site") return renderOfficeSchoolSite();
+  if (ui.computerView === "education-bureau") return renderEducationBureauSite();
+  if (ui.computerView === "academics") return renderOfficeAcademics();
+  return `<div class="office-panel office-desktop">
+    <div class="office-desk-art" aria-hidden="true"><div class="desk"></div><div class="monitor"><span>桌面</span></div><div class="paper-stack"></div></div>
+    <div class="office-icon-grid">
+      <button class="office-icon-card" type="button" data-action="computer-view" data-view="browser"><span>网</span><strong>浏览器</strong><small>学校官网 · 教育局官网</small></button>
+      <button class="office-icon-card" type="button" data-action="computer-view" data-view="academics"><span>教</span><strong>教务 App</strong><small>师生查询（壳）</small></button>
+      <button class="office-icon-card" type="button" data-action="office-tab" data-tab="calendar"><span>历</span><strong>校历</strong><small>年度安排</small></button>
+    </div>
+    <div class="office-panel-head" style="margin-top:14px"><strong>待签文件</strong><span>${state.office.pending.length} 份</span></div>
+    ${renderOfficeFiles()}
+  </div>`;
+}
+
+function renderOfficeBrowser() {
+  return `<div class="office-panel">
+    <div class="office-panel-head"><strong>浏览器</strong><button class="btn btn-ghost btn-sm" data-action="computer-view" data-view="desktop">返回桌面</button></div>
+    <button class="office-link" data-action="computer-view" data-view="school-site"><span>校</span><strong>学校官网</strong><small>学校概况 · 新闻 · 招生信息</small></button>
+    <button class="office-link" data-action="computer-view" data-view="education-bureau"><span>局</span><strong>四川省教育厅官网</strong><small>招生计划 · 办学层次 · 政务公开</small></button>
+  </div>`;
+}
+
+function renderEducationBureauSite() {
+  const total = planTotal();
+  const programs = getPrograms();
+  const tier = getSchoolTier();
+  const nextTier = nextSchoolTier(tier.id);
+  return `<div class="office-panel education-bureau">
+    <div class="bureau-browser-bar"><span>▣</span><div>https://jyt.sc.gov.cn/simulation</div><strong>政务</strong></div>
+    <header class="bureau-masthead">
+      <div class="bureau-emblem">川</div>
+      <div><strong>四川省教育厅</strong><small>教育政务服务 · 游戏模拟平台</small></div>
+      <span class="badge">SIMULATION</span>
+    </header>
+    <nav class="bureau-nav"><span>首页</span><span>招生计划</span><span>办学层次</span><span>通知公告</span><span>办事指南</span></nav>
+    <section class="bureau-hero">
+      <small>EDUCATION SERVICE PORTAL</small>
+      <h3>普通高等学校办事大厅</h3>
+      <p>学校提交申请后生成拟办文件，经校长签字后正式上报教育厅。</p>
+    </section>
+    <div class="bureau-grid">
+      <article class="bureau-card">
+        <div class="bureau-card-head"><span>01</span><div><strong>招生计划申报</strong><small>${state.time.year} 年 ${isAdmissionApplicationWindow() ? "申报开放中" : "当前不在申报期"}</small></div></div>
+        <div class="check-list">
+          <div class="check-row"><span>当前专业</span><strong>${programs.length} 个</strong></div>
+          <div class="check-row"><span>拟招生人数</span><strong>${formatNumber(total)} 人</strong></div>
+          <div class="check-row"><span>学校状态</span><strong>${escapeHtml({
+            not_started: "未提交",
+            submitted: "审核中",
+            approved: "已批准",
+            rejected: "未批准",
+            strategy_confirmed: "已确认策略",
+            results_published: "录取已公布",
+            completed: "已完成",
+            missed: "错过申报",
+          }[state.admissions.planStatus] || state.admissions.planStatus)}</strong></div>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:12px" data-action="office-bureau-admissions" ${!isAdmissionApplicationWindow() || !["not_started","rejected"].includes(state.admissions.planStatus) ? "disabled" : ""}>提交招生计划申请</button>
+      </article>
+      <article class="bureau-card">
+        <div class="bureau-card-head"><span>02</span><div><strong>办学层次申请</strong><small>${escapeHtml(tier.name)}${nextTier ? ` → ${escapeHtml(nextTier.name)}` : " · 已达最高层级"}</small></div></div>
+        <div class="check-list">
+          <div class="check-row"><span>省/国分数上限</span><strong>${tier.provincialCap}</strong></div>
+          <div class="check-row"><span>国际分数上限</span><strong>${tier.internationalCap}</strong></div>
+          <div class="check-row"><span>评估费用</span><strong>200 万</strong></div>
+        </div>
+        <button class="btn btn-outline" style="width:100%;margin-top:12px" data-action="office-bureau-level" ${nextTier ? "" : "disabled"}>提交${nextTier ? escapeHtml(nextTier.name) : "层级"}申请</button>
+      </article>
+    </div>
+    <section class="bureau-notices">
+      <div class="bureau-card-head"><span>通</span><div><strong>最新通知</strong><small>教育厅模拟公告</small></div></div>
+      <p>关于做好年度普通高校招生计划编制工作的通知</p>
+      <p>关于开展普通本科高校办学条件核查的说明</p>
+      <p>四川省高等学校设置评议工作办事指南</p>
+    </section>
+    <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:10px" data-action="computer-view" data-view="browser">返回浏览器</button>
+  </div>`;
+}
+
+function renderOfficeSchoolSite() {
+  const publicNews = state.news.filter(isPublicNews).slice(0, 4);
+  const tier = getSchoolTier();
+  return `<div class="office-panel school-mini-site">
+    <div class="bureau-browser-bar"><span>▣</span><div>https://www.qinghe.edu.cn</div><strong>官网</strong></div>
+    <header class="mini-site-head">
+      <div class="site-emblem">${escapeHtml(state.school.badge)}</div>
+      <div><strong>${escapeHtml(state.school.name)}</strong><small>QINGHE UNIVERSITY · ${state.school.founded}</small></div>
+      <span class="badge">${escapeHtml(tier.name)}</span>
+    </header>
+    <nav class="mini-site-nav"><span>学校概况</span><span>院系设置</span><span>招生就业</span><span>科学研究</span><span>校园生活</span></nav>
+    <section class="mini-site-hero">
+      <small>${state.time.year} · 学校官网</small>
+      <h3>${escapeHtml(state.site.headline)}</h3>
+      <p>${state.colleges.length ? `${state.colleges.length} 个学院 · ${getPrograms().length} 个专业 · ${formatNumber(state.resources.students)} 名在校学生` : "学校正在筹备首批学院与专业。"}</p>
+    </section>
+    <div class="mini-site-body">
+      <section>
+        <div class="bureau-card-head"><span>闻</span><div><strong>学校要闻</strong><small>公开新闻与校园动态</small></div></div>
+        <div class="mini-news-list">
+          ${publicNews.length ? publicNews.map((item) => `<div class="mini-news"><span>${escapeHtml(item.date.slice(5))}</span><strong>${escapeHtml(item.title)}</strong></div>`).join("") : `<p class="muted small">暂无公开新闻。</p>`}
+        </div>
+      </section>
+      <aside class="mini-site-data">
+        <div><span>学院</span><strong>${state.colleges.length}</strong></div>
+        <div><span>专业</span><strong>${getPrograms().length}</strong></div>
+        <div><span>学生</span><strong>${formatNumber(state.resources.students)}</strong></div>
+        <div><span>教师</span><strong>${state.resources.faculty}</strong></div>
+      </aside>
+    </div>
+    <button class="btn btn-ghost btn-sm" style="width:100%" data-action="computer-view" data-view="browser">返回浏览器</button>
+  </div>`;
+}
+
+function renderOfficeAcademics() {
+  return `<div class="office-panel">
+    <div class="office-panel-head"><strong>教务 App</strong><button class="btn btn-ghost btn-sm" data-action="computer-view" data-view="desktop">返回桌面</button></div>
+    ${state.colleges.map((college) => {
+      const stats = collegeStats(college);
+      return `<div class="person-card" style="margin-bottom:8px"><div class="avatar">${escapeHtml(college.icon)}</div><div class="person-copy"><strong>${escapeHtml(college.name)}</strong><span>${college.programs.length} 个专业 · 学生 ${stats.students} 人 · 教师 ${stats.faculty} 人</span></div><span class="badge">查询壳</span></div>`;
+    }).join("") || `<div class="notice"><span class="notice-icon">教</span><span>暂无学院，可先到学院与学科页设立首个学院。</span></div>`}
+  </div>`;
+}
+
+function renderOfficeFiles() {
+  if (!state.office.pending.length) return `<div class="notice"><span class="notice-icon">签</span><span>暂无待签文件。</span></div>`;
+  return state.office.pending.map((file) => `
+    <div class="office-file">
+      <div class="office-file-copy"><strong>${escapeHtml(file.title)}</strong><span>${escapeHtml(file.summary)}</span></div>
+      <div class="office-file-meta"><span>拟花费 ${formatMoney(file.cost)}</span><span>签署后结余 ${formatMoney(Math.round(state.resources.cash - file.cost))}</span></div>
+      <div class="office-file-actions">
+        <button class="btn btn-outline btn-sm" data-action="reject-office-action" data-id="${file.id}">拒绝</button>
+        <button class="btn btn-primary btn-sm" data-action="sign-office-action" data-id="${file.id}">签字确认</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function proposeOfficeAction(type, title, summary, cost, payload) {
+  closeModal();
+  const signature = `${type}:${JSON.stringify(payload)}`;
+  const existing = state.office.pending.find(
+    (file) => `${file.type}:${JSON.stringify(file.payload)}` === signature,
+  );
+  if (existing) {
+    saveState();
+    renderApp();
+    toast("文件已在待签队列", "相同拟办文件无需重复提交。", "info");
+    return;
+  }
+  state.office.pending.unshift({
+    id: `office-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+    type,
+    title,
+    summary,
+    cost,
+    payload,
+    createdAt: `${state.time.year}-${String(state.time.month).padStart(2, "0")}-${String(state.time.day).padStart(2, "0")}`,
+  });
+  saveState();
+  renderApp();
+  toast("已生成待签文件", "请到校长办公室的电脑桌面完成签字。", "success");
+}
+
+function dedupeOfficePending() {
+  if (!state?.office?.pending) return;
+  const seen = new Set();
+  state.office.pending = state.office.pending.filter((file) => {
+    const signature = `${file.type}:${JSON.stringify(file.payload)}`;
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+}
+
+function rejectOfficeAction(id) {
+  state.office.pending = state.office.pending.filter((file) => file.id !== id);
+  saveState();
+  renderApp();
+  toast("已拒绝拟办文件", "该操作未执行。", "info");
+}
+
+function signOfficeAction(id) {
+  const file = state.office.pending.find((item) => item.id === id);
+  if (!file) return;
+  state.office.pending = state.office.pending.filter((item) => item.id !== id);
+  const action = { ...file, signedAt: `${state.time.year}-${state.time.month}-${state.time.day}`, status: "signed" };
+  state.office.history.unshift(action);
+  executeOfficePayload(file.payload);
+  saveState();
+  renderApp();
+}
+
+function executeOfficePayload(payload) {
+  switch (payload.action) {
+    case "college":
+      chooseCollege(payload.templateId, payload.initial, true);
+      break;
+    case "program":
+      addProgramFromPayload(payload.collegeId, payload.majorName);
+      break;
+    case "admission":
+      submitAdmissionPlan(true);
+      break;
+    case "faculty":
+      hireFaculty(true);
+      break;
+    case "tier":
+      applyTierUpgrade(payload.targetTierId, true);
+      break;
+    case "research":
+      submitResearch(payload.projectId, true);
+      break;
+    case "buy_land":
+      buyPlot(payload.plotId, true);
+      break;
+    case "build":
+      buildPlot(payload.plotId, payload.buildingId, true);
+      break;
+    case "degree":
+      applyDegree(payload.degree, true);
+      break;
+    case "partner":
+      choosePartner(payload.partnerId, true);
+      break;
+    case "club":
+      chooseClub(payload.clubId, true);
+      break;
+    default:
+      break;
+  }
+}
+
 function getTerm(month, day = 1) {
   if (month === 1) return day >= 20 ? "寒假" : "寒假准备期";
   if (month === 2) return "寒假";
@@ -1072,7 +1476,7 @@ function clockTick() {
   const now = Date.now();
   const elapsed = now - clockLastMs;
   clockLastMs = now;
-  if (!state || !state.time.running || ui.modal || document.hidden) return;
+  if (!state || !state.time.running || ui.modal || ui.officeOpen || document.hidden) return;
   clockAccumulatorMs += elapsed;
   const interval = 60000 / state.time.speed;
   const dayInterval = interval / daysInMonth(state.time.month, state.time.year);
@@ -1104,6 +1508,7 @@ function advanceDay() {
 function advanceMonth() {
   processBankMonthly();
   processStocksMonthly();
+  processConstructionMonthly();
   if (state.time.month === 12) {
     state.time.month = 1;
     state.time.year += 1;
@@ -1354,6 +1759,24 @@ function processStocksMonthly() {
     const previous = prices[stock.symbol] || stock.basePrice;
     const move = stock.drift + stock.volatility * (stableFraction(`${stock.symbol}:${state.time.year}-${state.time.month}`) * 2 - 1);
     prices[stock.symbol] = roundScore(Math.max(1, previous * (1 + clamp(move, -0.12, 0.12))));
+  });
+}
+
+function processConstructionMonthly() {
+  state.office.construction = state.office.construction.filter((project) => {
+    project.monthsLeft -= 1;
+    if (project.monthsLeft > 0) return true;
+    const plot = state.campus.plots.find((item) => item.id === project.plotId);
+    const building = BUILDINGS.find((item) => item.id === project.buildingId);
+    if (plot && building && !plot.built) {
+      plot.built = building.id;
+      state.resources.capacity += building.capacity;
+      state.resources.quality = clamp(state.resources.quality + building.quality, 0, 100);
+      state.resources.research = clamp(state.resources.research + building.research, 0, 100);
+      state.resources.satisfaction = clamp(state.resources.satisfaction + building.satisfaction, 0, 100);
+      addNews(`${building.name}竣工启用`, `项目按期完成，新增培养容量 ${building.capacity} 人。`, "校园生活");
+    }
+    return false;
   });
 }
 
@@ -1626,6 +2049,7 @@ function renderAcademic() {
       ${COLLEGE_TEMPLATES.map((template) => {
         const college = state.colleges.find((item) => item.id === template.id);
         const openedPrograms = college?.programs || [];
+        const stats = college ? collegeStats(college) : null;
         const remaining = template.programs.filter((name) => !openedPrograms.some((program) => program.name === name));
         return `
           <section class="college-card">
@@ -1633,7 +2057,7 @@ function renderAcademic() {
               <div class="college-mark">${escapeHtml(template.icon)}</div>
               <div class="college-title">
                 <h3>${escapeHtml(template.name)}</h3>
-                <p>${escapeHtml(template.category)} · 可设专业 ${template.programs.length} 个${college ? ` · 已开设 ${openedPrograms.length} 个` : ""}</p>
+                <p>${escapeHtml(template.category)} · 可设专业 ${template.programs.length} 个${college ? ` · 已开设 ${openedPrograms.length} 个${stats ? ` · 学生 ${stats.students} · 教师 ${stats.faculty}` : ""}` : ""}</p>
               </div>
               <span class="badge">${college ? "已设立" : "未设立"}</span>
             </div>
@@ -1641,7 +2065,7 @@ function renderAcademic() {
               ${
                 college
                   ? openedPrograms.length
-                    ? `<div class="program-list">${openedPrograms.map((program) => `<span class="program-chip">${escapeHtml(program.name)}</span>`).join("")}</div>`
+                    ? `<div class="program-list">${openedPrograms.map((program) => `<span class="program-chip">${escapeHtml(program.name)}${stats ? ` · ${stats.perProgram}人` : ""}</span>`).join("")}</div>`
                     : `<p class="muted small">学院已设立，尚未开设专业。</p>`
                   : `<p class="muted small">${escapeHtml(template.summary)}</p>`
               }
@@ -1851,16 +2275,15 @@ function renderGovernance() {
       <div class="stack">
         <section class="panel">
           <div class="panel-head">
-            <div><h3>校长任命</h3><p>校长的专长会影响每年指标的自然增长</p></div>
-            <button class="btn btn-outline btn-sm" type="button" data-action="open-president">${president ? "改选校长" : "任命首任校长"}</button>
+            <div><h3>校长</h3><p>你是这所学校的正式校长</p></div>
           </div>
           <div class="panel-body">
             ${
               president
                 ? `<div class="person-card">
                     <div class="avatar">${escapeHtml(president.name.slice(0, 1))}</div>
-                    <div class="person-copy"><strong>${escapeHtml(president.name)} · 校长</strong><span>${escapeHtml(president.title)} · ${escapeHtml(president.trait)}型管理者</span></div>
-                    <span class="badge badge-gold">年薪 ${president.salary} 万</span>
+                    <div class="person-copy"><strong>${escapeHtml(president.name)} · 校长</strong><span>${escapeHtml(president.title)} · 玩家本人</span></div>
+                    <span class="badge badge-gold">在任</span>
                   </div>
                   <p class="muted small" style="margin:13px 0 0">“${escapeHtml(president.quote)}”</p>`
                 : `<div class="person-card">
@@ -2687,11 +3110,13 @@ function openModal(type, context = {}) {
 function closeModal() {
   ui.modal = null;
   modalRoot.innerHTML = "";
+  document.body.classList.remove("modal-open");
 }
 
 function renderModal() {
   if (!ui.modal || (!state && ui.modal.type !== "changelog")) {
     modalRoot.innerHTML = "";
+    document.body.classList.remove("modal-open");
     return;
   }
   const content = getModalContent(ui.modal.type, ui.modal.context);
@@ -2706,6 +3131,7 @@ function renderModal() {
       </section>
     </div>
   `;
+  document.body.classList.add("modal-open");
 }
 
 function modalHeader(title, subtitle, close = true) {
@@ -2752,7 +3178,7 @@ function getModalContent(type, ctx) {
 }
 
 function modalTutorial() {
-  const index = clamp(currentTutorialStep(), 0, TUTORIAL_STEPS.length - 1);
+  const index = clamp(ui.tutorialIndex ?? currentTutorialStep(), 0, TUTORIAL_STEPS.length - 1);
   const step = TUTORIAL_STEPS[index];
   return {
     size: "narrow tutorial",
@@ -2770,9 +3196,11 @@ function modalTutorial() {
       </div>
       <div class="tutorial-foot">
         <span class="step-count">${String(index + 1).padStart(2, "0")} / ${String(TUTORIAL_STEPS.length).padStart(2, "0")}</span>
-        <div style="display:flex;gap:7px">
+        <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px">
           <button class="btn btn-ghost btn-sm" type="button" data-action="close-modal">稍后再说</button>
-          <button class="btn btn-primary btn-sm" type="button" data-action="tutorial-go" data-view="${step.view}">${escapeHtml(step.action)}</button>
+          ${index > 0 ? `<button class="btn btn-outline btn-sm" type="button" data-action="tutorial-prev">上一步</button>` : ""}
+          ${index < TUTORIAL_STEPS.length - 1 ? `<button class="btn btn-outline btn-sm" type="button" data-action="tutorial-next">下一步</button>` : ""}
+          <button class="btn btn-primary btn-sm" type="button" data-action="tutorial-go" data-view="${step.view}" data-office="${step.office ? "true" : "false"}" data-browser="${step.browser ? "true" : "false"}">${escapeHtml(step.action)}</button>
         </div>
       </div>
     `,
@@ -3406,6 +3834,7 @@ function modalPlot(plotId) {
   };
 }
 
+// 旧版本 NPC 校长：当前仅作为彩蛋保留，不在 UI 中展示或调用。
 function modalPresident() {
   return {
     size: "wide",
@@ -3773,17 +4202,87 @@ function handleClick(event) {
       ui.sidebarOpen = false;
       renderApp();
       break;
+    case "toggle-office":
+      ui.officeOpen = !ui.officeOpen;
+      if (ui.officeOpen) {
+        ui.computerView = "desktop";
+        state.time.running = false;
+        clockAccumulatorMs = 0;
+        saveState();
+      }
+      renderApp();
+      break;
+    case "office-tab":
+      ui.officeTab = actionNode.dataset.tab || "calendar";
+      if (ui.officeTab === "calendar") {
+        ui.calendarYear = null;
+        ui.calendarMonth = null;
+      }
+      renderApp();
+      break;
+    case "calendar-move": {
+      const delta = Number(actionNode.dataset.delta) || 0;
+      const baseYear = ui.calendarYear || state.time.year;
+      const baseMonth = (ui.calendarMonth || state.time.month) - 1 + delta;
+      const next = new Date(Date.UTC(baseYear, baseMonth, 1));
+      ui.calendarYear = next.getUTCFullYear();
+      ui.calendarMonth = next.getUTCMonth() + 1;
+      renderApp();
+      break;
+    }
+    case "calendar-today":
+      ui.calendarYear = null;
+      ui.calendarMonth = null;
+      renderApp();
+      break;
+    case "computer-view":
+      ui.computerView = actionNode.dataset.view || "desktop";
+      renderApp();
+      break;
+    case "office-bureau-admissions":
+      submitAdmissionPlan();
+      break;
+    case "office-bureau-level": {
+      const target = nextSchoolTier();
+      if (target) applyTierUpgrade(target.id);
+      break;
+    }
+    case "sign-office-action":
+      signOfficeAction(actionNode.dataset.id);
+      break;
+    case "reject-office-action":
+      rejectOfficeAction(actionNode.dataset.id);
+      break;
     case "open-tutorial":
+      ui.tutorialIndex = currentTutorialStep();
       openModal("tutorial");
       break;
     case "open-changelog":
       openModal("changelog");
       break;
     case "tutorial-go":
-      ui.view = actionNode.dataset.view || "dashboard";
-      closeModal();
-      renderApp();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (actionNode.dataset.office === "true") {
+        closeModal();
+        ui.officeOpen = true;
+        ui.officeTab = "computer";
+        ui.computerView = actionNode.dataset.browser === "true" ? "browser" : "desktop";
+        state.time.running = false;
+        saveState();
+        renderApp();
+      } else {
+        ui.view = actionNode.dataset.view || "dashboard";
+        closeModal();
+        renderApp();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      break;
+    case "tutorial-next":
+      ui.tutorialIndex = clamp((ui.tutorialIndex ?? 0) + 1, 0, TUTORIAL_STEPS.length - 1);
+      renderModal();
+      break;
+    case "tutorial-prev":
+      ui.tutorialIndex = clamp((ui.tutorialIndex ?? 0) - 1, 0, TUTORIAL_STEPS.length - 1);
+      renderModal();
       break;
     case "open-save-menu":
       openModal("save-menu");
@@ -4059,6 +4558,9 @@ function handleInput(event) {
   if (target.id === "school-name") {
     ui.startForm.name = target.value;
   }
+  if (target.id === "principal-name") {
+    ui.startForm.principalName = target.value;
+  }
 }
 
 function handleKeydown(event) {
@@ -4106,7 +4608,7 @@ function resetGame() {
   toast("已建立空白档案", "可以开始新的办学合同。");
 }
 
-function chooseCollege(templateId, initial) {
+function chooseCollege(templateId, initial, execute = false) {
   const template = COLLEGE_TEMPLATES.find((item) => item.id === templateId);
   if (!template) return;
   if (state.colleges.some((college) => college.id === templateId)) {
@@ -4114,6 +4616,14 @@ function chooseCollege(templateId, initial) {
     return;
   }
   const cost = initial ? 620 : 980;
+  if (!execute) {
+    proposeOfficeAction("college", `设立${template.name}`, `拟投入 ${formatMoney(cost)}，开设${initial ? "前三个" : ""}对应专业。`, cost, {
+      action: "college",
+      templateId,
+      initial,
+    });
+    return;
+  }
   if (state.resources.cash < cost) {
     toast("资金不足", `设立学院需要 ${formatMoney(cost)}。`, "error");
     return;
@@ -4160,11 +4670,14 @@ function chooseCollege(templateId, initial) {
   closeModal();
   renderApp();
   if (initial) {
-    window.setTimeout(() => openModal("tutorial"), 250);
+    window.setTimeout(() => {
+      ui.tutorialIndex = currentTutorialStep();
+      openModal("tutorial");
+    }, 250);
   }
 }
 
-function addProgram(formData) {
+function addProgram(formData, execute = false) {
   const college = state.colleges.find((item) => item.id === formData.get("collegeId"));
   const majorName = String(formData.get("major") || "");
   if (!college || !majorName) {
@@ -4182,6 +4695,14 @@ function addProgram(formData) {
   const template = COLLEGE_TEMPLATES.find((item) => item.id === college.id);
   if (!template?.programs.includes(majorName)) {
     toast("专业不属于该学院", "只能开设本学院固定专业池内的专业。", "error");
+    return;
+  }
+  if (!execute) {
+    proposeOfficeAction("program", `开设${majorName}专业`, `${college.name}拟新增专业，建设投入 120 万元。`, 120, {
+      action: "program",
+      collegeId: college.id,
+      majorName,
+    });
     return;
   }
   const program = {
@@ -4204,6 +4725,13 @@ function addProgram(formData) {
   toast("专业开设完成", `${college.name}已新增${majorName}。`, "success");
 }
 
+function addProgramFromPayload(collegeId, majorName) {
+  const formData = new FormData();
+  formData.set("collegeId", collegeId);
+  formData.set("major", majorName);
+  addProgram(formData, true);
+}
+
 function adjustPlan(programId, delta) {
   if (state.admissions.planStatus === "approved" || state.admissions.campaignDone) return;
   const current = Number(state.admissions.draft[programId] || 0);
@@ -4212,7 +4740,7 @@ function adjustPlan(programId, delta) {
   renderApp();
 }
 
-function submitAdmissionPlan() {
+function submitAdmissionPlan(execute = false) {
   const programs = getPrograms();
   const total = planTotal();
   if (!isAdmissionApplicationWindow()) {
@@ -4233,6 +4761,12 @@ function submitAdmissionPlan() {
   }
   if (total > (state.admissions.annualQuota || annualAdmissionQuota())) {
     toast("超出本年度新生配额", `本年度最多可招 ${formatNumber(state.admissions.annualQuota || annualAdmissionQuota())} 名新生。`, "error");
+    return;
+  }
+  if (!execute) {
+    proposeOfficeAction("admission", "上报年度招生计划", `${programs.length} 个专业，合计 ${formatNumber(total)} 人。`, 0, {
+      action: "admission",
+    });
     return;
   }
   const submittedAt = { year: state.time.year, month: state.time.month, day: state.time.day };
@@ -4295,6 +4829,7 @@ function runCampaign(formData) {
   toast("招生策略已确认", "录取结果将在 7 月 1 日统一公布。", "success");
 }
 
+// 旧版本 NPC 校长任命：保留代码，不参与当前玩家校长流程。
 function choosePresident(candidateId) {
   const candidate = PRESIDENT_CANDIDATES.find((item) => item.id === candidateId);
   if (!candidate) return;
@@ -4321,13 +4856,17 @@ function choosePresident(candidateId) {
   toast("校长任命已发布", `${candidate.name}正式就任。`, "success");
 }
 
-function hireFaculty() {
+function hireFaculty(execute = false) {
   if (state.governance.facultyHires >= 2) {
     toast("年度引进额度已用完", "每学年最多可集中引进两批师资。", "info");
     return;
   }
   if (state.resources.cash < 180) {
     toast("资金不足", "人才引进需要 180 万元。", "error");
+    return;
+  }
+  if (!execute) {
+    proposeOfficeAction("faculty", "引进专任教师", "拟引进 8 名专任教师，费用 180 万元。", 180, { action: "faculty" });
     return;
   }
   state.resources.cash -= 180;
@@ -4381,7 +4920,7 @@ function applyUpgrade(target) {
   });
 }
 
-function applyTierUpgrade(targetTierId) {
+function applyTierUpgrade(targetTierId, execute = false) {
   const currentTier = getSchoolTier();
   const expectedTier = nextSchoolTier(currentTier.id);
   const targetTier = SCHOOL_TIERS.find((tier) => tier.id === targetTierId);
@@ -4398,6 +4937,13 @@ function applyTierUpgrade(targetTierId) {
   }
   if (state.resources.cash < 200) {
     toast("资金不足", "层级评估需要预留 200 万元。", "error");
+    return;
+  }
+  if (!execute) {
+    proposeOfficeAction("tier", `晋升为${targetTier.name}`, `层级评估费用 200 万元，签署后进入评议。`, 200, {
+      action: "tier",
+      targetTierId,
+    });
     return;
   }
   state.resources.cash -= 200;
@@ -4479,7 +5025,7 @@ function applyPublicConversion() {
   }
 }
 
-function submitResearch(projectId) {
+function submitResearch(projectId, execute = false) {
   const project = allResearchProjects().find((item) => item.id === projectId);
   if (!project) return;
   if (state.research.projects.some((item) => item.id === project.id && item.year === state.time.year)) {
@@ -4488,6 +5034,13 @@ function submitResearch(projectId) {
   }
   if (state.resources.cash < project.cost || state.resources.research < project.minResearch) {
     toast("无法申报", "请检查资金与科研门槛。", "error");
+    return;
+  }
+  if (!execute) {
+    proposeOfficeAction("research", `申报“${project.name}”`, `${project.level}项目申报，投入 ${project.cost} 万元。`, project.cost, {
+      action: "research",
+      projectId,
+    });
     return;
   }
   const platformBonus = state.campus.plots.some((plot) => plot.built === "lab" || plot.built === "industry") ? 0.06 : 0;
@@ -4518,7 +5071,14 @@ function submitResearch(projectId) {
   renderApp();
 }
 
-function applyDegree(degree) {
+function applyDegree(degree, execute = false) {
+  if (!execute) {
+    proposeOfficeAction("degree", `申请${degree === "master" ? "专业硕士" : "博士"}学位点`, "学位点评审申请，签署后正式提交。", 0, {
+      action: "degree",
+      degree,
+    });
+    return;
+  }
   const isMaster = degree === "master";
   const successChance = clamp(
     0.52 +
@@ -4546,11 +5106,18 @@ function applyDegree(degree) {
   commit({ scrollTop: true });
 }
 
-function buyPlot(plotId) {
+function buyPlot(plotId, execute = false) {
   const plot = state.campus.plots.find((item) => item.id === plotId);
   if (!plot || plot.owned) return;
   if (state.resources.cash < plot.price) {
     toast("资金不足", "可用资金不足以购买该地块。", "error");
+    return;
+  }
+  if (!execute) {
+    proposeOfficeAction("buy_land", `购置${plot.label}`, `用地购置价 ${formatMoney(plot.price)}。`, plot.price, {
+      action: "buy_land",
+      plotId,
+    });
     return;
   }
   state.resources.cash -= plot.price;
@@ -4563,7 +5130,7 @@ function buyPlot(plotId) {
   toast("用地购置完成", "可以继续选择校园建设项目。", "success");
 }
 
-function buildPlot(plotId, buildingId) {
+function buildPlot(plotId, buildingId, execute = false) {
   const plot = state.campus.plots.find((item) => item.id === plotId);
   const building = BUILDINGS.find((item) => item.id === buildingId);
   if (!plot || !plot.owned || plot.built || !building) return;
@@ -4571,22 +5138,31 @@ function buildPlot(plotId, buildingId) {
     toast("建设资金不足", `${building.name}需要 ${formatMoney(building.cost)}。`, "error");
     return;
   }
+  const durationMonths = ["library", "lab", "industry"].includes(buildingId) ? 9 : 6;
+  if (!execute) {
+    proposeOfficeAction("build", `建设${building.name}`, `施工周期 ${durationMonths} 个月，建设投入 ${formatMoney(building.cost)}。`, building.cost, {
+      action: "build",
+      plotId,
+      buildingId,
+    });
+    return;
+  }
   state.resources.cash -= building.cost;
-  plot.built = building.id;
-  state.resources.capacity += building.capacity;
-  state.resources.quality = clamp(state.resources.quality + building.quality, 0, 100);
-  state.resources.research = clamp(state.resources.research + building.research, 0, 100);
-  state.resources.satisfaction = clamp(state.resources.satisfaction + building.satisfaction, 0, 100);
-  addNews(
-    `${building.name}竣工启用`,
-    `学校在${plot.label}建成${building.name}，新增培养容量${building.capacity}人，进一步改善办学条件。`,
-    "校园生活",
-  );
-  commit();
-  toast("建设项目竣工", `${building.name}已加入校园地图。`, "success");
+  state.office.construction.push({
+    id: `build-${Date.now()}`,
+    plotId,
+    buildingId,
+    monthsLeft: durationMonths,
+    totalMonths: durationMonths,
+    startedAt: `${state.time.year}-${state.time.month}-${state.time.day}`,
+  });
+  addNews(`${building.name}开工建设`, `项目位于${plot.label}，预计 ${durationMonths} 个月后竣工。`, "校园生活");
+  saveState();
+  renderApp();
+  toast("施工已开始", `${building.name}将在 ${durationMonths} 个月后交付。`, "success");
 }
 
-function chooseClub(clubId) {
+function chooseClub(clubId, execute = false) {
   const choices = {
     robotics: { id: "robotics", name: "机器人创新社", icon: "机", category: "科技实践", members: 36, satisfaction: 3, description: "参加机器人、智能制造与工程实践赛事。" },
     drama: { id: "drama", name: "青禾话剧社", icon: "戏", category: "文艺表演", members: 42, satisfaction: 2, description: "原创校园戏剧与公共演出。" },
@@ -4596,6 +5172,10 @@ function chooseClub(clubId) {
   if (!club || state.clubs.some((item) => item.id === clubId)) return;
   if (state.resources.cash < 20) {
     toast("资金不足", "成立社团需要 20 万元。", "error");
+    return;
+  }
+  if (!execute) {
+    proposeOfficeAction("club", `成立${club.name}`, "学生社团设立，拟投入 20 万元。", 20, { action: "club", clubId });
     return;
   }
   state.resources.cash -= 20;
@@ -4666,7 +5246,7 @@ function registerCompetition(competitionId) {
   toast(award === "未获奖" ? "参赛完成" : `获得${award}`, award === "未获奖" ? "本轮未获奖项，参赛经验已保留。" : `声誉 +${reputationGain} · 科研 +${researchGain}`, award === "未获奖" ? "info" : "success");
 }
 
-function choosePartner(partnerId) {
+function choosePartner(partnerId, execute = false) {
   const options = {
     cloud: { id: "cloud", name: "川云智能科技", field: "人工智能 / 软件服务", cost: 120, employment: 3, research: 2 },
     manufacture: { id: "manufacture", name: "锦城精密制造", field: "智能制造 / 工业机器人", cost: 150, employment: 4, research: 2 },
@@ -4676,6 +5256,10 @@ function choosePartner(partnerId) {
   if (!partner || state.partnerships.some((item) => item.id === partnerId)) return;
   if (state.resources.cash < partner.cost) {
     toast("签约资金不足", "请先调整年度预算。", "error");
+    return;
+  }
+  if (!execute) {
+    proposeOfficeAction("partner", `签约${partner.name}`, `校企合作签约，拟投入 ${formatMoney(partner.cost)}。`, partner.cost, { action: "partner", partnerId });
     return;
   }
   state.resources.cash -= partner.cost;

@@ -10,8 +10,8 @@
 - 仓库地址：https://github.com/wangshangruiCN/qinghe-university-simulator
 - 线上地址（手机优先）：https://cdn.jsdelivr.net/gh/wangshangruiCN/qinghe-university-simulator@main/index.html
 - 备用地址：https://wangshangruicn.github.io/qinghe-university-simulator/
-- 当前版本：0.3.2（正式发布）
-- 本文档状态：v0.3.2 手机排行榜适配发布
+- 当前版本：0.4.0（正式发布）
+- 本文档状态：v0.4.0 玩家校长与校长办公室已发布
 - 最后更新：2026-10-27
 
 ## 1. 项目边界与共识
@@ -190,6 +190,7 @@ Git 不会在我每次修改时自动提交，需要我主动创建提交。但�
 | 2026-10-27 | v0.3.0：招生校历、审批工作日、7月录取、9月入学 | 已发布 |
 | 2026-10-27 | v0.3.1：手机端顶栏、日期学期显示与全页面适配 | 已发布 |
 | 2026-10-27 | v0.3.2：手机排行榜水平卡片、紧凑标签与榜单布局 | 已发布 |
+| 2026-10-27 | v0.4.0：玩家校长、校长办公室、拟办签字、建筑施工 | 已发布 |
 
 ## 9. 下一步
 
