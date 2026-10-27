@@ -3906,7 +3906,42 @@ svg {
   }
 
   .topbar {
-    padding: 0 18px;
+    min-height: auto;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 8px 16px;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    flex: 1 1 100%;
+  }
+
+  .topbar-left {
+    min-width: 0;
+  }
+
+  .topbar-meta {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .topbar-date,
+  .topbar-term {
+    display: inline-flex;
+    white-space: nowrap;
+  }
+
+  .topbar-right {
+    justify-content: flex-end;
+  }
+
+  .topbar-actions {
+    margin-right: auto;
+  }
+
+  #toast-root {
+    top: calc(106px + env(safe-area-inset-top));
   }
 
   .content {
@@ -3989,9 +4024,6 @@ svg {
     min-height: 58px;
   }
 
-  .topbar-date,
-  .topbar-divider,
-  .topbar-term,
   .save-state {
     display: none;
   }
@@ -4014,7 +4046,7 @@ svg {
   }
 
   #toast-root {
-    top: calc(68px + env(safe-area-inset-top));
+    top: calc(104px + env(safe-area-inset-top));
     right: 12px;
     bottom: auto;
     left: 12px;

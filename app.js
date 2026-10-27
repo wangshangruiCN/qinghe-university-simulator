@@ -15,8 +15,19 @@ import {
   WORLD_UNIVERSITIES,
 } from "./data.js";
 
-const APP_VERSION = "0.3.0";
+const APP_VERSION = "0.3.1";
 const CHANGELOG = [
+  {
+    version: "v0.3.1",
+    date: "2026-10-27",
+    summary: "手机端顶栏与全页面适配",
+    items: [
+      "手机和平板顶栏改为两行，完整显示日期与学期",
+      "时间控制、官网入口、帮助按钮重新排布，避免拥挤",
+      "首页、招生、金融、榜单和官网完成手机宽度检查",
+      "提示框位置跟随新顶栏调整，页面无横向溢出",
+    ],
+  },
   {
     version: "v0.3.0",
     date: "2026-10-27",
