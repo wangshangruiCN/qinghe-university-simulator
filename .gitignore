@@ -1,4 +1,5 @@
 .tools/
+.backups/
 .browser-*/
 qa-*.png
 qa-*.mjs

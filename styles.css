@@ -588,13 +588,64 @@ svg {
   background: rgba(255, 255, 255, 0.065);
 }
 
+.changelog-versions {
+  display: grid;
+  gap: 8px;
+}
+
+.changelog-version {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.changelog-version summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  padding: 11px 13px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink);
+}
+
+.changelog-version summary::-webkit-details-marker {
+  display: none;
+}
+
+.changelog-version summary::after {
+  grid-row: 1 / 3;
+  grid-column: 2;
+  align-self: center;
+  color: var(--ink-soft);
+  content: "+";
+  font-size: 18px;
+}
+
+.changelog-version[open] summary::after {
+  content: "−";
+}
+
+.changelog-version-name {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.changelog-version-meta {
+  color: var(--ink-soft);
+  font-size: 9px;
+}
+
 .changelog-list {
   display: grid;
   gap: 9px;
-  margin: 0;
-  padding-left: 20px;
-  color: #9fb2ad;
-  font-size: 11px;
+  margin: 0 13px 13px;
+  padding: 11px 0 0 20px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--ink-soft);
+  font-size: 10px;
   line-height: 1.7;
 }
 
@@ -2908,6 +2959,32 @@ svg {
   font-weight: 650;
 }
 
+.ranking-tier-line {
+  margin-top: 5px;
+  color: #7b6c50;
+  font-size: 9px;
+}
+
+.university-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.uni-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 5px;
+  border: 1px solid #d9c69e;
+  border-radius: 100px;
+  background: #f5ead4;
+  color: #7a5822;
+  font-size: 8px;
+  font-weight: 750;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
 .rank-number {
   width: 42px;
   color: #8b8f87;
@@ -3559,6 +3636,21 @@ svg {
 }
 
 /* Toast */
+#toast-root {
+  position: fixed;
+  right: 22px;
+  bottom: calc(22px + env(safe-area-inset-bottom));
+  z-index: 220;
+  display: grid;
+  width: min(340px, calc(100vw - 44px));
+  gap: 8px;
+  pointer-events: none;
+}
+
+#toast-root .toast {
+  pointer-events: auto;
+}
+
 .toast-stack {
   position: fixed;
   right: 22px;
@@ -3919,6 +4011,14 @@ svg {
 
   .content {
     padding: 17px 13px 35px;
+  }
+
+  #toast-root {
+    top: calc(68px + env(safe-area-inset-top));
+    right: 12px;
+    bottom: auto;
+    left: 12px;
+    width: auto;
   }
 
   .page-head {

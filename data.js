@@ -658,6 +658,239 @@ export const WORLD_UNIVERSITIES = [
   ["香港大学", "中国香港", 91.3], ["洛桑联邦理工学院", "瑞士", 91.0],
 ].map(([name, country, score], index) => ({ name, country, score, rank: index + 1 }));
 
+export const SCHOOL_TIERS = [
+  {
+    id: "private2",
+    name: "民办二本",
+    nature: "private",
+    provincialCap: 80,
+    nationalCap: 80,
+    internationalCap: 800,
+    domesticTags: [],
+    internationalTag: null,
+    requirements: { students: 800, quality: 25, reputation: 20, cash: 1500 },
+  },
+  {
+    id: "private1",
+    name: "民办一本",
+    nature: "private",
+    provincialCap: 120,
+    nationalCap: 120,
+    internationalCap: 1200,
+    domesticTags: [],
+    internationalTag: null,
+    requirements: { students: 2000, quality: 35, reputation: 35, cash: 3000, years: 2 },
+  },
+  {
+    id: "public2",
+    name: "公办二本",
+    nature: "public",
+    provincialCap: 180,
+    nationalCap: 180,
+    internationalCap: 1800,
+    domesticTags: [],
+    internationalTag: null,
+    requirements: { students: 3500, quality: 45, reputation: 45, research: 25, cash: 4500, years: 3 },
+  },
+  {
+    id: "public1",
+    name: "公办一本",
+    nature: "public",
+    provincialCap: 240,
+    nationalCap: 240,
+    internationalCap: 2400,
+    domesticTags: [],
+    internationalTag: null,
+    requirements: { students: 5000, quality: 55, reputation: 55, research: 35, cash: 6000, years: 4 },
+  },
+  {
+    id: "provincial_key",
+    name: "省重点本科",
+    nature: "public",
+    provincialCap: 320,
+    nationalCap: 320,
+    internationalCap: 3200,
+    domesticTags: [],
+    internationalTag: null,
+    requirements: { students: 7000, quality: 65, reputation: 65, research: 45, cash: 8000, years: 5 },
+  },
+  {
+    id: "double_first",
+    name: "双一流",
+    nature: "public",
+    provincialCap: 400,
+    nationalCap: 400,
+    internationalCap: 4000,
+    domesticTags: ["双一流"],
+    internationalTag: null,
+    requirements: { students: 9000, quality: 72, reputation: 72, research: 55, cash: 10000, years: 6 },
+  },
+  {
+    id: "project_211",
+    name: "211",
+    nature: "public",
+    provincialCap: 500,
+    nationalCap: 500,
+    internationalCap: 5000,
+    domesticTags: ["211", "双一流"],
+    internationalTag: null,
+    requirements: { students: 11000, quality: 78, reputation: 80, research: 65, cash: 13000, years: 8 },
+  },
+  {
+    id: "project_985",
+    name: "985",
+    nature: "public",
+    provincialCap: 600,
+    nationalCap: 600,
+    internationalCap: 6000,
+    domesticTags: ["985", "211", "双一流"],
+    internationalTag: null,
+    requirements: { students: 14000, quality: 83, reputation: 85, research: 72, cash: 16000, years: 10 },
+  },
+  {
+    id: "asia_top",
+    name: "亚洲一流本科院校",
+    nature: "public",
+    provincialCap: 700,
+    nationalCap: 700,
+    internationalCap: 7000,
+    domesticTags: ["985", "211", "双一流"],
+    internationalTag: "亚洲一流",
+    requirements: { students: 18000, quality: 87, reputation: 88, research: 78, cash: 20000, years: 12 },
+  },
+  {
+    id: "asia_key",
+    name: "亚洲重点本科院校",
+    nature: "public",
+    provincialCap: 800,
+    nationalCap: 800,
+    internationalCap: 8000,
+    domesticTags: ["985", "211", "双一流"],
+    internationalTag: "亚洲重点",
+    requirements: { students: 24000, quality: 91, reputation: 91, research: 84, cash: 26000, years: 14 },
+  },
+  {
+    id: "world_top",
+    name: "世界一流本科院校",
+    nature: "public",
+    provincialCap: 900,
+    nationalCap: 900,
+    internationalCap: 9000,
+    domesticTags: ["985", "211", "双一流"],
+    internationalTag: "世界一流",
+    requirements: { students: 30000, quality: 94, reputation: 94, research: 88, cash: 32000, years: 16 },
+  },
+  {
+    id: "world_key",
+    name: "世界重点本科院校",
+    nature: "public",
+    provincialCap: 1000,
+    nationalCap: 1000,
+    internationalCap: 10000,
+    domesticTags: ["985", "211", "双一流"],
+    internationalTag: "世界重点",
+    requirements: null,
+  },
+];
+
+const NINE_EIGHT_FIVE = new Set([
+  "清华大学", "北京大学", "浙江大学", "上海交通大学", "复旦大学", "南京大学",
+  "中国科学技术大学", "华中科技大学", "武汉大学", "西安交通大学", "中山大学",
+  "北京航空航天大学", "东南大学", "北京理工大学", "四川大学", "哈尔滨工业大学",
+  "同济大学", "中国人民大学", "北京师范大学", "天津大学", "南开大学",
+  "西北工业大学", "山东大学", "中南大学", "厦门大学", "华南理工大学",
+  "吉林大学", "大连理工大学", "电子科技大学", "湖南大学", "重庆大学",
+  "华东师范大学", "东北大学", "中国农业大学", "兰州大学", "中国海洋大学",
+  "西北农林科技大学", "中央民族大学",
+]);
+
+const TWO_ONE_ONE_ONLY = new Set([
+  "郑州大学", "北京科技大学", "武汉理工大学", "南京理工大学", "南京航空航天大学",
+  "西安电子科技大学", "华中农业大学", "苏州大学", "华东理工大学", "暨南大学",
+  "北京交通大学", "东北师范大学", "南京师范大学", "中国地质大学（武汉）",
+  "西北大学", "中国矿业大学", "南京农业大学", "西南交通大学", "华南师范大学",
+  "合肥工业大学", "上海大学", "北京邮电大学", "中国石油大学（华东）",
+  "华中师范大学", "陕西师范大学", "江南大学", "北京工业大学", "湖南师范大学",
+  "中国政法大学", "上海财经大学", "中南财经政法大学", "北京化工大学",
+  "福州大学", "中国传媒大学", "对外经济贸易大学", "西南财经大学",
+  "北京林业大学", "云南大学", "西南大学", "广西大学", "哈尔滨工程大学",
+  "南昌大学", "安徽大学", "贵州大学", "太原理工大学", "中国药科大学",
+  "新疆大学", "四川农业大学",
+]);
+
+const DOUBLE_FIRST_CLASS_ONLY = new Set([
+  "首都师范大学", "南方科技大学", "宁波大学", "南京信息工程大学",
+  "南京林业大学", "南京邮电大学", "上海中医药大学", "河南大学",
+  "华南农业大学", "成都理工大学", "西南石油大学", "成都中医药大学",
+]);
+
+export function getDomesticTags(name) {
+  if (NINE_EIGHT_FIVE.has(name)) return ["985", "211", "双一流"];
+  if (TWO_ONE_ONE_ONLY.has(name)) return ["211", "双一流"];
+  if (DOUBLE_FIRST_CLASS_ONLY.has(name)) return ["双一流"];
+  return [];
+}
+
+const INTERNATIONAL_TAG_MAP = {
+  哈佛大学: "世界重点",
+  麻省理工学院: "世界重点",
+  牛津大学: "世界重点",
+  斯坦福大学: "世界重点",
+  剑桥大学: "世界重点",
+  加州大学伯克利分校: "世界重点",
+  普林斯顿大学: "世界重点",
+  加州理工学院: "世界重点",
+  耶鲁大学: "世界重点",
+  哥伦比亚大学: "世界重点",
+  帝国理工学院: "世界重点",
+  芝加哥大学: "世界重点",
+  宾夕法尼亚大学: "世界一流",
+  约翰斯·霍普金斯大学: "世界一流",
+  苏黎世联邦理工学院: "世界一流",
+  新加坡国立大学: "世界一流",
+  多伦多大学: "世界一流",
+  清华大学: "世界一流",
+  北京大学: "世界一流",
+  东京大学: "世界一流",
+  墨尔本大学: "世界一流",
+  伦敦大学学院: "世界一流",
+  加州大学洛杉矶分校: "世界一流",
+  康奈尔大学: "世界一流",
+  南洋理工大学: "世界一流",
+  爱丁堡大学: "世界一流",
+  密歇根大学安娜堡分校: "北美洲重点",
+  澳大利亚国立大学: "大洋洲重点",
+  香港大学: "亚洲重点",
+  洛桑联邦理工学院: "欧洲重点",
+};
+
+export function getInternationalTag(name) {
+  return INTERNATIONAL_TAG_MAP[name] || null;
+}
+
+export const BANK_RATES = {
+  demand: 0.0035,
+  fixed: [
+    { months: 3, annualRate: 0.011 },
+    { months: 6, annualRate: 0.013 },
+    { months: 12, annualRate: 0.0155 },
+  ],
+  loanBaseRate: 0.055,
+  loanSpreadMin: -0.005,
+  loanSpreadMax: 0.03,
+};
+
+export const STOCK_MARKET = [
+  { symbol: "QHSZ", name: "青禾数智", sector: "数字科技", basePrice: 42.0, drift: 0.01, volatility: 0.09 },
+  { symbol: "SHXL", name: "蜀芯科技", sector: "电子信息", basePrice: 58.0, drift: 0.008, volatility: 0.1 },
+  { symbol: "CYZZ", name: "川云装备", sector: "智能制造", basePrice: 36.5, drift: 0.006, volatility: 0.08 },
+  { symbol: "XHNY", name: "星河新能源", sector: "新能源", basePrice: 64.0, drift: 0.012, volatility: 0.12 },
+  { symbol: "JCYY", name: "锦城医药", sector: "生物医药", basePrice: 51.5, drift: 0.007, volatility: 0.09 },
+  { symbol: "SCWL", name: "蜀道物流", sector: "现代物流", basePrice: 28.0, drift: 0.005, volatility: 0.06 },
+  { symbol: "RWSJ", name: "人文数媒", sector: "数字媒体", basePrice: 33.0, drift: 0.009, volatility: 0.11 },
+  { symbol: "JCLY", name: "锦城文旅", sector: "文旅消费", basePrice: 24.5, drift: 0.004, volatility: 0.07 },
+];
+
 export const COMPETITIONS = [
   {
     id: "campus-innovation",

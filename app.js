@@ -1,26 +1,76 @@
 import {
+  BANK_RATES,
   BUILDINGS,
   CAMPUS_PLOTS,
   COLLEGE_TEMPLATES_V2 as COLLEGE_TEMPLATES,
   COMPETITIONS,
   DIFFICULTIES,
+  SCHOOL_TIERS,
+  STOCK_MARKET,
+  getDomesticTags,
+  getInternationalTag,
   NATIONAL_UNIVERSITIES,
   PRESIDENT_CANDIDATES,
   SICHUAN_UNIVERSITIES,
   WORLD_UNIVERSITIES,
 } from "./data.js";
 
-const APP_VERSION = "0.2.1";
+const APP_VERSION = "0.3.0";
 const CHANGELOG = [
-  "学院体系重构：10 个具体学院，专业直接归属学院",
-  "修复任何学院都能开设任意专业的问题",
-  "修复排名过虚：民办本科开局，省榜每年最多上升 3 名",
-  "修复全国榜与世界榜不显示本校位次的问题",
-  "招生改为按培养容量分四年自动分配",
-  "修复手机端帮助按钮不可见、不可点击的问题",
-  "修复手机顶栏官网预览按钮显示与点击问题",
-  "开始页与设置页显示当前版本号",
-  "更新公告改为可关闭的版本弹窗",
+  {
+    version: "v0.3.0",
+    date: "2026-10-27",
+    summary: "自动校历、招生流程、银行与股市正式版",
+    items: [
+      "时间系统改为自动推进，暂停、1x、2x、4x 速度可调",
+      "校历从 1 月 1 日开始，日期逐日推进并正确跨月跨年",
+      "招生计划 1–4 月申报，审批随机等待 10–25 个工作日",
+      "7 月公布录取结果，9 月新生正式入学",
+      "新增寒假、春季开学、军训、毕业和年度事件通知",
+      "重要事件以通知卡片呈现，处理、跳过或关闭提醒",
+      "新增银行：活期、3/6/12 个月定期、贷款与信用评分",
+      "新增虚拟股票市场，民办学校可交易，公办学校锁定",
+      "负面校务结果不再进入校园官网新闻",
+    ],
+  },
+  {
+    version: "v0.2.2-dev",
+    date: "2026-10-27",
+    summary: "学校层级与年度排名系统",
+    items: [
+      "新增民办二本至世界重点本科的 12 级学校层级",
+      "省榜与全国榜改为 1000 分制，国际榜改为 10000 分制",
+      "排名改为每学年统一更新，NPC 分数也会逐年增长",
+      "国内榜叠加显示 985、211、双一流",
+      "国际榜显示每所学校对应的最高国际标签",
+      "修正密歇根大学安娜堡分校、洛桑联邦理工学院、澳大利亚国立大学的国际标签",
+      "层级晋升后自动更新学校标签并发布官网新闻",
+      "手机提示框固定在顶栏下方，不再需要滚动查看",
+    ],
+  },
+  {
+    version: "v0.2.1",
+    date: "2026-10-27",
+    summary: "公告与手机官网入口修复",
+    items: [
+      "修复手机顶栏官网预览按钮显示与点击问题",
+      "更新公告改为可关闭的版本弹窗",
+    ],
+  },
+  {
+    version: "v0.2.0",
+    date: "2026-10-27",
+    summary: "学院重构与核心规则修复",
+    items: [
+      "学院体系重构为 10 个具体学院，专业直接归属学院",
+      "修复任何学院都能开设任意专业的问题",
+      "修复排名过虚：民办本科开局，省榜每年最多上升 3 名",
+      "修复全国榜与世界榜不显示本校位次的问题",
+      "招生改为按培养容量分四年自动分配",
+      "修复手机端帮助按钮不可见、不可点击的问题",
+      "开始页与设置页显示当前版本号",
+    ],
+  },
 ];
 
 const LEGACY_COLLEGE_MAP = {
@@ -50,6 +100,7 @@ const NAV_ITEMS = [
   { view: "governance", label: "校务与师资", icon: "◎", group: "ACADEMY" },
   { view: "research", label: "科研与学位", icon: "⌁", group: "ACADEMY" },
   { view: "campus", label: "校园建设", icon: "▦", group: "OPERATIONS" },
+  { view: "finance", label: "银行与投资", icon: "¥", group: "OPERATIONS" },
   { view: "life", label: "校园生活", icon: "✦", group: "OPERATIONS" },
   { view: "rankings", label: "大学排行榜", icon: "≋", group: "REPUTATION" },
   { view: "website", label: "校园官网", icon: "▤", group: "REPUTATION" },
@@ -83,7 +134,7 @@ const TUTORIAL_STEPS = [
   {
     kicker: "04 / 结算",
     title: "用年度经营检验决定",
-    body: "结束本学年后，会结算学费、师资与运营成本，处理自然流失、生成排名变化和新闻。有盈利才能继续扩张。",
+    body: "时间会自动推进。学年结束后，会结算学费、师资与运营成本，处理自然流失、生成排名变化和新闻。",
     action: "查看年度工作",
     view: "dashboard",
     art: "年",
@@ -111,6 +162,7 @@ const ui = {
   },
   rankingTab: "sichuan",
   lifeTab: "clubs",
+  financeTab: "bank",
   modal: null,
   tutorialIndex: 0,
 };
@@ -125,6 +177,17 @@ document.addEventListener("change", handleChange);
 document.addEventListener("input", handleInput);
 document.addEventListener("keydown", handleKeydown);
 
+let clockAccumulatorMs = 0;
+let clockLastMs = Date.now();
+setInterval(clockTick, 1000);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && state?.time.running) {
+    state.time.running = false;
+    saveState();
+    renderApp();
+  }
+});
+
 render();
 
 function loadState() {
@@ -132,7 +195,25 @@ function loadState() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed.version === 2 ? parsed : migrateLegacyState(parsed);
+    if (parsed.version === 5) {
+      parsed.school.tier = parsed.school.tier || (parsed.school.nature === "public" ? "public2" : "private2");
+      parsed.ranking = parsed.ranking || null;
+      parsed.tierHistory = parsed.tierHistory || [];
+      parsed.bank = parsed.bank || { demand: 0, fixed: [], loans: [], credit: 100, transactions: [] };
+      parsed.stock = parsed.stock || { cash: 0, holdings: {}, realized: 0, prices: Object.fromEntries(STOCK_MARKET.map((item) => [item.symbol, item.basePrice])), transactions: [] };
+      parsed.notifications = parsed.notifications || { queue: [], muted: {}, resumedSpeed: 1 };
+      parsed.admissions = normalizeAdmissionsState(parsed.admissions, parsed.time.year);
+      parsed.time.month = parsed.time.month || 9;
+      parsed.time.day = parsed.time.day || 1;
+      parsed.time.running = false;
+      parsed.time.academicYearStarted = Boolean(parsed.time.academicYearStarted);
+      parsed.calendarMilestones = parsed.calendarMilestones || [];
+      normalizeTimeYear(parsed);
+      return parsed;
+    }
+    const migrated = migrateLegacyState(parsed);
+    localStorage.setItem(SAVE_KEY, JSON.stringify(migrated));
+    return migrated;
   } catch {
     return null;
   }
@@ -141,22 +222,31 @@ function loadState() {
 function migrateLegacyState(legacy) {
   const migrated = {
     ...legacy,
-    version: 2,
+    version: 5,
     school: {
       ...legacy.school,
       level: legacy.school.level === "专科" ? "本科" : legacy.school.level,
+      tier: legacy.school.tier || (legacy.school.nature === "public" ? "public2" : "private2"),
     },
     colleges: (legacy.colleges || []).map((college) => {
-      const nextId = LEGACY_COLLEGE_MAP[college.id];
+      const nextId = LEGACY_COLLEGE_MAP[college.id]
+        || COLLEGE_TEMPLATES.find((item) => item.id === college.id)?.id
+        || COLLEGE_TEMPLATES.find((item) => item.name === college.name)?.id;
       if (!nextId) return null;
       const template = COLLEGE_TEMPLATES.find((item) => item.id === nextId);
-      const programs = (college.disciplines || []).flatMap((discipline) =>
-        discipline.programs.map((program) => ({
-          id: program.id,
-          name: program.name,
-          code: program.code || "510000",
-        })),
-      );
+      const programs = college.disciplines
+        ? college.disciplines.flatMap((discipline) =>
+            discipline.programs.map((program) => ({
+              id: program.id,
+              name: program.name,
+              code: program.code || "510000",
+            })),
+          )
+        : (college.programs || []).map((program) => ({
+            id: program.id,
+            name: program.name,
+            code: program.code || "510000",
+          }));
       return {
         ...college,
         id: nextId,
@@ -171,15 +261,47 @@ function migrateLegacyState(legacy) {
     }).filter(Boolean),
   };
   migrated.admissions.annualQuota = migrated.admissions.annualQuota || Math.round((migrated.resources.capacity || 1200) / 4);
-  if (!migrated.rank) {
-    migrated.rank = {
-      provincial: 41,
-      national: 1000,
-      world: 9200,
-      strength: 16,
-    };
-  }
+  migrated.ranking = null;
+  migrated.tierHistory = migrated.tierHistory || [];
+  migrated.bank = migrated.bank || { demand: 0, fixed: [], loans: [], credit: 100, transactions: [] };
+  migrated.stock = migrated.stock || { cash: 0, holdings: {}, realized: 0, prices: Object.fromEntries(STOCK_MARKET.map((item) => [item.symbol, item.basePrice])), transactions: [] };
+  migrated.notifications = migrated.notifications || { queue: [], muted: {}, resumedSpeed: 1 };
+  migrated.admissions = normalizeAdmissionsState(migrated.admissions, migrated.time.year);
+  migrated.time.month = migrated.time.month || 9;
+  migrated.time.day = migrated.time.day || 1;
+  migrated.time.running = false;
+  migrated.time.academicYearStarted = Boolean(migrated.time.academicYearStarted);
+  migrated.calendarMilestones = migrated.calendarMilestones || [];
+  normalizeTimeYear(migrated);
   return migrated;
+}
+
+function normalizeAdmissionsState(admissions = {}, year = 2026) {
+  return {
+    draft: {},
+    annualQuota: 300,
+    planStatus: "not_started",
+    approvedTotal: 0,
+    campaignDone: false,
+    lastResult: null,
+    cohorts: [],
+    ...admissions,
+    applicationYear: admissions.applicationYear || year,
+    submittedAt: admissions.submittedAt || null,
+    reviewStartedAt: admissions.reviewStartedAt || null,
+    decisionAt: admissions.decisionAt || null,
+    decisionResult: admissions.decisionResult || null,
+    resultPublishedAt: admissions.resultPublishedAt || null,
+    pendingFreshmen: admissions.pendingFreshmen || 0,
+    strategy: admissions.strategy || "steady",
+  };
+}
+
+function normalizeTimeYear(targetState) {
+  if (!targetState?.time || !targetState?.school) return;
+  if (targetState.time.year < targetState.school.founded) {
+    targetState.time.year = targetState.school.founded;
+  }
 }
 
 function saveState() {
@@ -237,9 +359,9 @@ function difficultyData() {
   return DIFFICULTIES.find((item) => item.id === state.difficulty) || DIFFICULTIES[0];
 }
 
-function schoolStrength() {
-  if (!state) return 0;
-  const r = state.resources;
+function schoolStrength(targetState = state) {
+  if (!targetState) return 0;
+  const r = targetState.resources;
   return clamp(
     r.quality * 0.28 +
       r.research * 0.24 +
@@ -251,30 +373,149 @@ function schoolStrength() {
   );
 }
 
-function computeRawRankings() {
-  if (!state) return { provincial: 41, national: 1000, world: 9200, strength: 0 };
-  const strength = schoolStrength();
-  const bonus = LEVEL_BONUS[state.school.level] || 0;
-  const provincial = SICHUAN_UNIVERSITIES.filter((item) => item.score > strength).length + 1;
+function getSchoolTier(tierId = state?.school.tier) {
+  return SCHOOL_TIERS.find((tier) => tier.id === tierId) || SCHOOL_TIERS[0];
+}
+
+function nextSchoolTier(tierId = state?.school.tier) {
+  const index = SCHOOL_TIERS.findIndex((tier) => tier.id === tierId);
+  return index >= 0 ? SCHOOL_TIERS[index + 1] || null : null;
+}
+
+function stableFraction(text) {
+  let hash = 2166136261;
+  for (const char of text) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
+function npcAnnualGrowth(name, min, max, year) {
+  return min + stableFraction(`${name}:${year}`) * (max - min);
+}
+
+function baseNpcScores() {
   return {
-    provincial,
-    national: clamp(Math.round(1180 - strength * 11 - bonus), 1, 2000),
-    world: clamp(Math.round(9800 - strength * 40 - bonus * 8), 1, 12000),
-    strength,
+    sichuan: Object.fromEntries(SICHUAN_UNIVERSITIES.map((item) => [item.name, roundScore(item.score * 10)])),
+    national: Object.fromEntries(NATIONAL_UNIVERSITIES.map((item) => [item.name, roundScore(item.score * 10)])),
+    world: Object.fromEntries(WORLD_UNIVERSITIES.map((item) => [item.name, roundScore(item.score * 100)])),
   };
 }
 
-function getRankings() {
-  if (!state) return { provincial: 41, national: 1000, world: 9200, strength: 0 };
-  const raw = computeRawRankings();
-  const previous = state.rank?.provincial ?? raw.provincial;
-  const provincial = raw.provincial < previous
-    ? Math.max(raw.provincial, previous - 3)
-    : raw.provincial;
+function roundScore(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function playerRankingScores(targetState) {
+  const tier = getSchoolTier(targetState.school.tier);
+  const strength = schoolStrength(targetState);
   return {
-    ...raw,
-    provincial,
+    provincial: roundScore(Math.min(tier.provincialCap, strength * 8)),
+    national: roundScore(Math.min(tier.nationalCap, strength * 8)),
+    world: roundScore(Math.min(tier.internationalCap, strength * 80)),
   };
+}
+
+function estimateDomesticNationalRank(scores, playerScore) {
+  const sorted = Object.values(scores).sort((a, b) => b - a);
+  const above = sorted.filter((score) => score > playerScore).length;
+  if (above < sorted.length) return above + 1;
+  const floor = sorted[sorted.length - 1] || 600;
+  return Math.max(101, 100 + Math.ceil(Math.max(0, floor - playerScore) / 5));
+}
+
+function estimateWorldRank(scores, playerScore) {
+  const sorted = Object.values(scores).sort((a, b) => b - a);
+  const above = sorted.filter((score) => score > playerScore).length;
+  if (above < sorted.length) return above + 1;
+  const floor = sorted[sorted.length - 1] || 9000;
+  return Math.max(31, 30 + Math.ceil(Math.max(0, floor - playerScore) / 8));
+}
+
+function rankSnapshotFromScores(npc, playerScores) {
+  return {
+    provincial: 1 + Object.values(npc.sichuan).filter((score) => score > playerScores.provincial).length,
+    national: estimateDomesticNationalRank(npc.national, playerScores.national),
+    world: estimateWorldRank(npc.world, playerScores.world),
+  };
+}
+
+function createRankingSnapshot(targetState) {
+  const npc = baseNpcScores();
+  const player = playerRankingScores(targetState);
+  return {
+    updatedYear: targetState.time.year,
+    npc,
+    player,
+    ranks: rankSnapshotFromScores(npc, player),
+  };
+}
+
+function advanceRankingSnapshot(targetState, year) {
+  if (!targetState.ranking) targetState.ranking = createRankingSnapshot(targetState);
+  if (targetState.ranking.updatedYear === year) return targetState.ranking;
+  const previous = targetState.ranking;
+  const npc = {
+    sichuan: Object.fromEntries(
+      SICHUAN_UNIVERSITIES.map((item) => [
+        item.name,
+        roundScore(Math.min(1000, previous.npc.sichuan[item.name] + npcAnnualGrowth(item.name, 0.4, 1.2, year))),
+      ]),
+    ),
+    national: Object.fromEntries(
+      NATIONAL_UNIVERSITIES.map((item) => [
+        item.name,
+        roundScore(Math.min(1000, previous.npc.national[item.name] + npcAnnualGrowth(item.name, 0.8, 2.2, year))),
+      ]),
+    ),
+    world: Object.fromEntries(
+      WORLD_UNIVERSITIES.map((item) => [
+        item.name,
+        roundScore(Math.min(10000, previous.npc.world[item.name] + npcAnnualGrowth(item.name, 8, 20, year))),
+      ]),
+    ),
+  };
+  const player = playerRankingScores(targetState);
+  targetState.ranking = {
+    updatedYear: year,
+    npc,
+    player,
+    ranks: rankSnapshotFromScores(npc, player),
+  };
+  return targetState.ranking;
+}
+
+function getRankings() {
+  if (!state) {
+    return {
+      provincial: 41,
+      national: 900,
+      world: 1200,
+      strength: 0,
+      updatedYear: 2026,
+      player: { provincial: 0, national: 0, world: 0 },
+      tier: SCHOOL_TIERS[0],
+    };
+  }
+  if (!state.ranking) state.ranking = createRankingSnapshot(state);
+  return {
+    provincial: state.ranking.ranks.provincial,
+    national: state.ranking.ranks.national,
+    world: state.ranking.ranks.world,
+    strength: schoolStrength(),
+    updatedYear: state.ranking.updatedYear,
+    player: state.ranking.player,
+    tier: getSchoolTier(state.school.tier),
+  };
+}
+
+function playerDomesticTags() {
+  return getSchoolTier(state.school.tier).domesticTags;
+}
+
+function playerInternationalTag() {
+  return getSchoolTier(state.school.tier).internationalTag;
 }
 
 function approxApprovalChance() {
@@ -337,13 +578,15 @@ function redistributeAdmissionDraft() {
 function currentAction() {
   if (!state?.flags.firstCollege) return { view: "academic", label: "建立首个学院" };
   if (state.admissions.planStatus === "not_started" || state.admissions.planStatus === "rejected") {
-    return { view: "admissions", label: "上报招生计划" };
+    return { view: "admissions", label: isAdmissionApplicationWindow() ? "上报招生计划" : "等待下一招生季" };
   }
+  if (state.admissions.planStatus === "submitted") return { view: "admissions", label: "等待招生审批" };
   if (state.admissions.planStatus === "approved" && !state.admissions.campaignDone) {
-    return { view: "admissions", label: "启动年度招生" };
+    return { view: "admissions", label: "确认招生策略" };
   }
-  if (!state.history.length) return { view: "dashboard", label: "结束本学年" };
-  return { view: "dashboard", label: "规划新学年" };
+  if (state.admissions.planStatus === "strategy_confirmed") return { view: "admissions", label: "等待录取公布" };
+  if (state.admissions.planStatus === "results_published") return { view: "admissions", label: "等待新生入学" };
+  return { view: "dashboard", label: "推进校务日程" };
 }
 
 function currentTutorialStep() {
@@ -355,7 +598,7 @@ function currentTutorialStep() {
   return 4;
 }
 
-function addNews(title, summary, category = "学校要闻", dateOverride = null) {
+function addNews(title, summary, category = "学校要闻", dateOverride = null, publicNews = true) {
   const date = dateOverride || `${state.time.year}-${String(9 + (state.news.length % 3)).padStart(2, "0")}-${String(8 + (state.news.length % 18)).padStart(2, "0")}`;
   state.news.unshift({
     id: `news-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
@@ -363,8 +606,17 @@ function addNews(title, summary, category = "学校要闻", dateOverride = null)
     summary,
     category,
     date,
+    public: publicNews,
   });
   state.news = state.news.slice(0, 30);
+}
+
+function isPublicNews(item) {
+  if (item.public === false) return false;
+  if (item.public === true) return true;
+  return !["未获批准", "未通过", "未获立项", "需进一步完善", "申请完成评议"].some((keyword) =>
+    item.title.includes(keyword),
+  );
 }
 
 function toast(title, detail, kind = "info") {
@@ -536,6 +788,8 @@ function startNewGame(formData) {
   }
 
   state = createInitialState({ name, nature, difficulty });
+  state.ranking = createRankingSnapshot(state);
+  state.calendarMilestones.push(`${state.time.year}-admissions-open`);
   ui.active = true;
   ui.view = "dashboard";
   saveState();
@@ -548,7 +802,7 @@ function startNewGame(formData) {
 function createInitialState({ name, nature, difficulty }) {
   const year = 2026;
   return {
-    version: 2,
+    version: 5,
     createdAt: Date.now(),
     difficulty: difficulty.id,
     school: {
@@ -556,6 +810,7 @@ function createInitialState({ name, nature, difficulty }) {
       shortName: name.length > 8 ? name.slice(0, 8) : name,
       nature,
       level: "本科",
+      tier: nature === "public" ? "public2" : "private2",
       province: "四川省",
       city: "成都市",
       founded: year,
@@ -564,8 +819,13 @@ function createInitialState({ name, nature, difficulty }) {
     },
     time: {
       year,
+      month: 1,
+      day: 1,
       term: "秋季学期",
       turn: 0,
+      running: true,
+      speed: 1,
+      academicYearStarted: false,
     },
     resources: {
       cash: difficulty.cash,
@@ -589,6 +849,14 @@ function createInitialState({ name, nature, difficulty }) {
       campaignDone: false,
       lastResult: null,
       cohorts: [],
+      applicationYear: year,
+      submittedAt: null,
+      reviewStartedAt: null,
+      decisionAt: null,
+      decisionResult: null,
+      resultPublishedAt: null,
+      pendingFreshmen: 0,
+      strategy: "steady",
     },
     campus: {
       plots: CAMPUS_PLOTS.map((plot) => ({
@@ -620,6 +888,25 @@ function createInitialState({ name, nature, difficulty }) {
     competitions: { entries: {} },
     partnerships: [],
     research: { projects: [], platforms: [] },
+    bank: {
+      demand: 0,
+      fixed: [],
+      loans: [],
+      credit: 100,
+      transactions: [],
+    },
+    stock: {
+      cash: 0,
+      holdings: {},
+      realized: 0,
+      prices: Object.fromEntries(STOCK_MARKET.map((item) => [item.symbol, item.basePrice])),
+      transactions: [],
+    },
+    notifications: {
+      queue: [],
+      muted: {},
+      resumedSpeed: 1,
+    },
     governance: {
       president: null,
       interim: true,
@@ -636,12 +923,9 @@ function createInitialState({ name, nature, difficulty }) {
     },
     news: [],
     history: [],
-    rank: {
-      provincial: 41,
-      national: 1000,
-      world: 9200,
-      strength: 15,
-    },
+    calendarMilestones: [],
+    ranking: null,
+    tierHistory: [],
     lastAnnualReport: null,
     flags: {
       firstCollege: false,
@@ -653,6 +937,8 @@ function createInitialState({ name, nature, difficulty }) {
 
 function renderApp() {
   if (!state) return;
+  normalizeTimeYear(state);
+  if (!state.ranking) state.ranking = createRankingSnapshot(state);
   const ranks = getRankings();
   const urgent = {
     admission:
@@ -670,7 +956,7 @@ function renderApp() {
         </div>
         <div class="school-chip">
           <strong title="${escapeHtml(state.school.name)}">${escapeHtml(state.school.name)}</strong>
-          <span>${schoolNatureLabel()} · ${escapeHtml(state.school.level)} · 四川省</span>
+          <span>${schoolNatureLabel()} · ${escapeHtml(getSchoolTier().name)} · 四川省</span>
         </div>
         <div class="nav-scroll">
           ${groups
@@ -705,9 +991,9 @@ function renderApp() {
           <div class="topbar-left">
             <button class="icon-btn mobile-menu" type="button" data-action="toggle-sidebar" aria-label="打开导航">☰</button>
             <div class="topbar-meta">
-              <span class="topbar-date mono">${state.time.year} / 学年</span>
+              <span class="topbar-date mono">${state.time.year} 年 ${String(state.time.month).padStart(2, "0")} 月 ${String(state.time.day).padStart(2, "0")} 日</span>
               <span class="topbar-divider"></span>
-              <span class="topbar-term">${escapeHtml(state.time.term)} · 规划期</span>
+              <span class="topbar-term">${escapeHtml(state.time.term)}</span>
             </div>
           </div>
           <div class="topbar-right">
@@ -716,7 +1002,10 @@ function renderApp() {
               <button class="icon-btn" type="button" data-action="open-tutorial" aria-label="打开教程">?</button>
               <button class="btn btn-outline btn-sm site-preview-btn" type="button" data-action="open-site" title="打开校园官网" aria-label="打开校园官网"><span class="site-preview-icon" aria-hidden="true">▤</span><span class="site-preview-label">官网预览</span></button>
             </div>
-            <button class="btn btn-dark btn-sm end-year-btn" type="button" data-action="open-advance">结束本学年 <span class="end-year-arrow" aria-hidden="true">→</span></button>
+            <button class="btn btn-dark btn-sm end-year-btn" type="button" data-action="toggle-clock">${state.time.running ? "暂停" : "继续"}时间</button>
+            <div class="segmented time-speed">
+              ${[1, 2, 4].map((speed) => `<button class="${state.time.speed === speed ? "active" : ""}" type="button" data-action="set-speed" data-speed="${speed}">${speed}x</button>`).join("")}
+            </div>
           </div>
         </header>
         <main class="content">${viewContent}</main>
@@ -735,10 +1024,325 @@ function renderCurrentView(ranks) {
     research: renderResearch,
     campus: renderCampus,
     life: renderLife,
+    finance: renderFinance,
     rankings: renderRankings,
     website: renderWebsite,
   };
   return (renderers[ui.view] || renderDashboard)(ranks);
+}
+
+function getTerm(month, day = 1) {
+  if (month === 1) return day >= 20 ? "寒假" : "寒假准备期";
+  if (month === 2) return "寒假";
+  if (month >= 3 && month <= 6) return "春季学期";
+  if (month === 7 || month === 8) return "暑假";
+  return "秋季学期";
+}
+
+function daysInMonth(month, year) {
+  const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month === 2 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) return 29;
+  return days[month - 1];
+}
+
+function clockTick() {
+  const now = Date.now();
+  const elapsed = now - clockLastMs;
+  clockLastMs = now;
+  if (!state || !state.time.running || ui.modal || document.hidden) return;
+  clockAccumulatorMs += elapsed;
+  const interval = 60000 / state.time.speed;
+  const dayInterval = interval / daysInMonth(state.time.month, state.time.year);
+  let advanced = false;
+  while (clockAccumulatorMs >= dayInterval) {
+    clockAccumulatorMs -= dayInterval;
+    advanceDay();
+    advanced = true;
+  }
+  if (advanced) {
+    saveState();
+    renderApp();
+    if (state.notifications.queue.length) openModal("notification");
+  }
+}
+
+function advanceDay() {
+  state.time.day += 1;
+  const days = daysInMonth(state.time.month, state.time.year);
+  if (state.time.day > days) {
+    state.time.day = 1;
+    advanceMonth();
+  } else {
+    state.time.term = getTerm(state.time.month, state.time.day);
+  }
+  processCalendarDay();
+}
+
+function advanceMonth() {
+  processBankMonthly();
+  processStocksMonthly();
+  if (state.time.month === 12) {
+    state.time.month = 1;
+    state.time.year += 1;
+  } else if (state.time.month === 8) {
+    state.time.month = 9;
+  } else {
+    state.time.month += 1;
+  }
+  state.time.day = 1;
+  state.time.term = getTerm(state.time.month, state.time.day);
+}
+
+function enqueueNotification(notification) {
+  if (state.notifications.muted[notification.type]) return;
+  state.notifications.resumedSpeed = state.time.speed || 1;
+  state.time.running = false;
+  state.notifications.queue.push(notification);
+}
+
+function notificationTypeLabel(type) {
+  return {
+    settlement: "学年结算",
+    admissions: "招生计划",
+    graduation: "毕业季",
+    fixed_deposit: "定期存款到期",
+    loan_due: "贷款还款",
+    stock_news: "市场动态",
+  }[type] || type;
+}
+
+function dateNumber(year = state.time.year, month = state.time.month, day = state.time.day) {
+  return year * 10000 + month * 100 + day;
+}
+
+function isAdmissionApplicationWindow() {
+  return dateNumber() >= dateNumber(state.time.year, 1, 1)
+    && dateNumber() <= dateNumber(state.time.year, 4, 30);
+}
+
+function addWorkingDays(startDate, count) {
+  const cursor = new Date(Date.UTC(startDate.year, startDate.month - 1, startDate.day));
+  let added = 0;
+  while (added < count) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    const weekday = cursor.getUTCDay();
+    if (weekday !== 0 && weekday !== 6) added += 1;
+  }
+  return { year: cursor.getUTCFullYear(), month: cursor.getUTCMonth() + 1, day: cursor.getUTCDate() };
+}
+
+function formatGameDate(value) {
+  if (!value) return "—";
+  return `${value.year}.${String(value.month).padStart(2, "0")}.${String(value.day).padStart(2, "0")}`;
+}
+
+function milestoneOnce(key) {
+  if (state.calendarMilestones.includes(key)) return false;
+  state.calendarMilestones.push(key);
+  return true;
+}
+
+function processCalendarDay() {
+  const { year, month, day } = state.time;
+  state.time.term = getTerm(month, day);
+
+  if (month === 1 && day === 1 && milestoneOnce(`${year}-admissions-open`)) {
+    if (state.admissions.applicationYear < year) resetAdmissionCycle(year);
+    enqueueNotification({
+      type: "admissions",
+      title: `${year} 年招生季开始`,
+      detail: "招生计划申报已开放，最晚请于 4 月 30 日前提交。",
+      view: "admissions",
+    });
+  }
+  if (month === 1 && day === 20 && milestoneOnce(`${year}-winter`)) {
+    enqueueNotification({ type: "winter", title: "寒假开始", detail: "寒假时间为 1 月 20 日至 2 月末。", view: "life" });
+  }
+  if (month === 3 && day === 1 && milestoneOnce(`${year}-spring`)) {
+    enqueueNotification({ type: "semester", title: "春季学期开学", detail: "春季学期教学工作正式开始。", view: "dashboard" });
+  }
+  if (month === 4 && day === 20 && milestoneOnce(`${year}-deadline-reminder`)) {
+    enqueueNotification({ type: "admissions", title: "招生计划即将截止", detail: "招生计划将在 4 月 30 日截止提交。", view: "admissions" });
+  }
+  if (month === 4 && day === 30 && milestoneOnce(`${year}-admissions-deadline`)) {
+    enqueueNotification({ type: "admissions", title: "招生计划申报截止", detail: "本年度招生计划申报窗口已关闭。", view: "admissions" });
+  }
+  if (month === 5 && day === 31) {
+    if (["not_started", "rejected"].includes(state.admissions.planStatus)) {
+      state.admissions.planStatus = "missed";
+      state.admissions.decisionResult = "missed";
+      enqueueNotification({ type: "admission_result", title: "本年度招生申报结束", detail: "学校未在截止日前提交有效招生计划。", view: "admissions" });
+    }
+    processAdmissionReviews(true);
+  }
+  if (month === 6 && day === 1 && milestoneOnce(`${year}-graduation`)) processGraduation();
+  if (month === 7 && day === 1 && milestoneOnce(`${year}-results`)) publishAdmissionResults();
+  if (month === 9 && day === 1 && milestoneOnce(`${year}-opening`)) {
+    if (state.time.academicYearStarted) settleYear({ silent: true });
+    state.time.academicYearStarted = true;
+    enrollPendingFreshmen();
+    enqueueNotification({ type: "opening", title: "新学年正式开学", detail: "新生报到完成，秋季学期开始。", view: "dashboard" });
+  }
+  if (month === 10 && day === 1 && milestoneOnce(`${year}-military`)) {
+    state.resources.satisfaction = clamp(state.resources.satisfaction + 1, 0, 100);
+    addNews("新生军训圆满结束", "新生完成军训与入学教育，正式进入课程学习阶段。", "校园生活");
+    enqueueNotification({ type: "military", title: "新生军训开始", detail: "军训与入学教育本月开展。", view: "life" });
+  }
+  processAdmissionReviews(false);
+}
+
+function resetAdmissionCycle(year) {
+  state.admissions.applicationYear = year;
+  state.admissions.planStatus = "not_started";
+  state.admissions.approvedTotal = 0;
+  state.admissions.campaignDone = false;
+  state.admissions.submittedAt = null;
+  state.admissions.reviewStartedAt = null;
+  state.admissions.decisionAt = null;
+  state.admissions.decisionResult = null;
+  state.admissions.resultPublishedAt = null;
+  state.admissions.pendingFreshmen = 0;
+  state.admissions.strategy = "steady";
+  redistributeAdmissionDraft();
+}
+
+function processAdmissionReviews(force = false) {
+  if (!["submitted"].includes(state.admissions.planStatus)) return;
+  const due = state.admissions.decisionAt && dateNumber() >= dateNumber(state.admissions.decisionAt.year, state.admissions.decisionAt.month, state.admissions.decisionAt.day);
+  const forced = force || dateNumber() >= dateNumber(state.time.year, 5, 31);
+  if (!due && !forced) return;
+  const approved = Math.random() < approxApprovalChance();
+  state.admissions.planStatus = approved ? "approved" : "rejected";
+  state.admissions.decisionResult = approved ? "approved" : "rejected";
+  if (approved) {
+    state.admissions.approvedTotal = planTotal();
+    addNews(`${state.time.year}年招生计划获批`, `本年度计划招生 ${formatNumber(state.admissions.approvedTotal)} 人。`, "招生就业");
+  } else {
+    state.admissions.approvedTotal = 0;
+    addNews("年度招生计划未获批准", "学校将根据反馈优化培养条件。", "通知公告", null, false);
+  }
+  enqueueNotification({
+    type: "admission_result",
+    title: approved ? "招生计划获批" : "招生计划未获批准",
+    detail: approved ? `共批复 ${formatNumber(state.admissions.approvedTotal)} 人，可在 6 月 30 日前确认招生策略。` : "本年度招生计划未获批准。",
+    view: "admissions",
+  });
+}
+
+function processGraduation() {
+  const remaining = [];
+  let graduates = 0;
+  state.admissions.cohorts.forEach((cohort) => {
+    if (state.time.year - cohort.year >= 4) graduates += cohort.size;
+    else remaining.push(cohort);
+  });
+  if (!graduates) return;
+  state.admissions.cohorts = remaining;
+  state.resources.students = remaining.reduce((sum, cohort) => sum + cohort.size, 0);
+  state.resources.alumni += graduates;
+  state.lastGraduationCount = graduates;
+  addNews(`${state.time.year}届学生毕业`, `${formatNumber(graduates)} 名学生完成学业，加入校友会。`, "学校要闻");
+  enqueueNotification({ type: "graduation", title: "毕业季", detail: `${formatNumber(graduates)} 名学生毕业并加入校友会。`, view: "life" });
+}
+
+function publishAdmissionResults() {
+  if (!["approved", "strategy_confirmed"].includes(state.admissions.planStatus)) return;
+  const strategy = state.admissions.strategy || "steady";
+  const bonuses = { steady: 0.58, media: 0.63, scholarship: 0.68 };
+  const threshold = state.resources.quality * 0.003 + state.resources.reputation * 0.002 + state.resources.employment * 0.001;
+  const yieldRate = clamp((bonuses[strategy] || 0.58) + threshold + randomBetween(-0.05, 0.05), 0.45, 0.96);
+  const actual = Math.min(state.admissions.approvedTotal, Math.round(state.admissions.approvedTotal * yieldRate));
+  state.admissions.lastResult = {
+    year: state.time.year,
+    planned: state.admissions.approvedTotal,
+    actual,
+    yield: actual / Math.max(1, state.admissions.approvedTotal),
+    cost: state.admissions.campaignCost || 0,
+    cohortQuality: Math.round(clamp(48 + state.resources.quality * 0.3 + state.resources.reputation * 0.2, 35, 96)),
+    strategy,
+    reach: "四川省内",
+  };
+  state.admissions.pendingFreshmen = actual;
+  state.admissions.resultPublishedAt = { year: state.time.year, month: 7, day: 1 };
+  state.admissions.planStatus = "results_published";
+  addNews(`${state.time.year}年录取结果公布`, `共录取 ${formatNumber(actual)} 名新生，新生将于 9 月报到。`, "招生就业");
+  enqueueNotification({ type: "admission_result", title: "录取结果已公布", detail: `共录取 ${formatNumber(actual)} 名新生，9 月正式入学。`, view: "admissions" });
+}
+
+function enrollPendingFreshmen() {
+  const count = state.admissions.pendingFreshmen || 0;
+  if (count <= 0) return;
+  state.admissions.cohorts.push({ year: state.time.year, size: count, initialSize: count, quality: state.admissions.lastResult?.cohortQuality || 55 });
+  state.resources.students += count;
+  addNews(`${state.time.year}级新生完成报到`, `${formatNumber(count)} 名新生正式入学，学校进入新学年。`, "招生就业");
+  state.admissions.pendingFreshmen = 0;
+  state.admissions.planStatus = "completed";
+}
+
+function processBankMonthly() {
+  const bank = state.bank;
+  const demandInterest = bank.demand * (BANK_RATES.demand / 12);
+  bank.demand = roundScore(bank.demand + demandInterest);
+  if (demandInterest > 0) addBankTransaction("利息", roundScore(demandInterest), "活期存款结息");
+
+  bank.fixed = bank.fixed.filter((deposit) => {
+    deposit.monthsLeft -= 1;
+    if (deposit.monthsLeft > 0) return true;
+    const interest = deposit.principal * (deposit.annualRate / 12) * deposit.termMonths;
+    bank.demand = roundScore(bank.demand + deposit.principal + interest);
+    addBankTransaction("到账", roundScore(deposit.principal + interest), `${deposit.termMonths}个月定期到期`);
+    enqueueNotification({
+      type: "fixed_deposit",
+      title: "定期存款到期",
+      detail: `${formatMoney(deposit.principal)}定期存款已到期，本金与利息转入活期。`,
+      view: "finance",
+    });
+    return false;
+  });
+
+  bank.loans.forEach((loan) => {
+    const interest = loan.remaining * (loan.annualRate / 12);
+    const payment = loan.monthlyPrincipal + interest;
+    if (state.resources.cash >= payment) {
+      state.resources.cash = roundScore(state.resources.cash - payment);
+      loan.remaining = roundScore(Math.max(0, loan.remaining - loan.monthlyPrincipal));
+      loan.monthsLeft -= 1;
+      addBankTransaction("还款", roundScore(payment), `贷款 ${loan.id} 月供`);
+      bank.credit = Math.min(100, bank.credit + 1);
+    } else {
+      loan.overdue += 1;
+      loan.penalty += payment * 0.03;
+      bank.credit = Math.max(0, bank.credit - 10);
+      addBankTransaction("逾期", roundScore(payment), `贷款 ${loan.id} 逾期未还`);
+      enqueueNotification({
+        type: "loan_due",
+        title: "贷款还款不足",
+        detail: `贷款 ${loan.id} 本期还款 ${formatMoney(roundScore(payment))}，现金不足已形成逾期。`,
+        view: "finance",
+      });
+    }
+  });
+  bank.loans = bank.loans.filter((loan) => loan.monthsLeft > 0);
+}
+
+function processStocksMonthly() {
+  const prices = state.stock.prices;
+  STOCK_MARKET.forEach((stock) => {
+    const previous = prices[stock.symbol] || stock.basePrice;
+    const move = stock.drift + stock.volatility * (stableFraction(`${stock.symbol}:${state.time.year}-${state.time.month}`) * 2 - 1);
+    prices[stock.symbol] = roundScore(Math.max(1, previous * (1 + clamp(move, -0.12, 0.12))));
+  });
+}
+
+function addBankTransaction(type, amount, note) {
+  state.bank.transactions.unshift({
+    id: `bk-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+    type,
+    amount,
+    note,
+    date: `${state.time.year}.${String(state.time.month).padStart(2, "0")}`,
+  });
+  state.bank.transactions = state.bank.transactions.slice(0, 60);
 }
 
 function pageHead(kicker, title, description, actions = "") {
@@ -812,7 +1416,7 @@ function renderDashboard(ranks) {
       `${state.time.year} ACADEMIC YEAR`,
       "校务总览",
       `欢迎回来，${state.governance.president ? escapeHtml(state.governance.president.name) : "代校长"}。今天处理哪些决定？`,
-      `<span class="badge badge-gold">${schoolNatureLabel()} · ${state.school.level}</span>`,
+      `<span class="badge badge-gold">${schoolNatureLabel()} · ${escapeHtml(getSchoolTier().name)}</span>`,
     )}
 
     <section class="dashboard-hero">
@@ -831,9 +1435,9 @@ function renderDashboard(ranks) {
             <div><strong>${ranks.provincial}</strong><span>省内位次</span></div>
           </div>
           <div class="rank-copy">
-            <small>COMPREHENSIVE INDEX</small>
-            <strong>综合实力 ${ranks.strength.toFixed(1)}</strong>
-            <span>全国约第 ${formatNumber(ranks.national)} 位<br />世界约第 ${formatNumber(ranks.world)} 位</span>
+            <small>RANKING SNAPSHOT · ${ranks.updatedYear}</small>
+            <strong>${escapeHtml(ranks.tier.name)}</strong>
+            <span>省榜 ${ranks.player.provincial.toFixed(1)}/1000 · 全国 ${ranks.player.national.toFixed(1)}/1000<br />国际 ${ranks.player.world.toFixed(1)}/10000</span>
           </div>
         </div>
         <div class="hero-quote">“${state.governance.president?.quote || "先把第一届学生教好，再谈宏大的愿景。"}”</div>
@@ -1083,15 +1687,23 @@ function renderAdmissions() {
   const ratio = state.resources.faculty ? state.resources.students / state.resources.faculty : 0;
   const statusLabel = {
     not_started: "待上报",
+    submitted: "审核中",
     rejected: "未获批准",
     approved: "已批复",
+    strategy_confirmed: "招生策略已确认",
+    results_published: "录取结果已公布",
     completed: "本年度已完成",
+    missed: "错过申报",
   }[status];
   const statusClass = {
     not_started: "status-pending",
+    submitted: "status-info",
     rejected: "status-danger",
     approved: "status-info",
+    strategy_confirmed: "status-info",
+    results_published: "status-success",
     completed: "status-success",
+    missed: "status-danger",
   }[status];
 
   return `
@@ -1124,15 +1736,17 @@ function renderAdmissions() {
         </div>
         <div class="panel-body">
           ${
-            state.admissions.campaignDone || status === "approved"
-              ? `<div class="notice" style="margin-bottom:13px"><span class="notice-icon">批</span><span>教育厅已批复 ${formatNumber(state.admissions.approvedTotal)} 人。${status === "approved" ? "招生计划已锁定，接下来需要开展招生投放。" : "本年度招生已结束，计划将在新学年重置。"}</span></div>`
-              : ""
+            status === "submitted"
+              ? `<div class="notice" style="margin-bottom:13px"><span class="notice-icon">审</span><span>计划已于 ${formatGameDate(state.admissions.submittedAt)} 提交，预计 ${formatGameDate(state.admissions.decisionAt)} 前答复。</span></div>`
+              : ["approved", "strategy_confirmed", "results_published", "completed"].includes(status)
+                ? `<div class="notice" style="margin-bottom:13px"><span class="notice-icon">批</span><span>教育厅已批复 ${formatNumber(state.admissions.approvedTotal)} 人。${status === "approved" ? "请在 6 月 30 日前确认招生策略。" : status === "strategy_confirmed" ? "策略已确认，录取结果将在 7 月 1 日公布。" : status === "results_published" ? "录取已公布，新生将在 9 月 1 日报到。" : "本年度招生已完成。"}</span></div>`
+                : ""
           }
           <div>
             ${programs
               .map((program) => {
                 const value = Number(state.admissions.draft[program.id] ?? 0);
-                const disabled = status === "approved" || state.admissions.campaignDone;
+                const disabled = !["not_started", "rejected"].includes(status) || !isAdmissionApplicationWindow();
                 return `
                   <div class="plan-row">
                     <div class="plan-program"><strong>${escapeHtml(program.name)}</strong><span>${escapeHtml(program.collegeName)} · ${escapeHtml(program.category)}</span></div>
@@ -1153,11 +1767,13 @@ function renderAdmissions() {
           </div>
           <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:17px">
             ${
-              status === "not_started" || status === "rejected"
+              (status === "not_started" || status === "rejected") && isAdmissionApplicationWindow()
                 ? `<button class="btn btn-primary" type="button" data-action="submit-plan">提交教育厅审批</button>`
-                : status === "approved"
-                  ? `<button class="btn btn-primary" type="button" data-action="open-campaign">启动招生投放</button>`
-                  : `<button class="btn btn-outline" type="button" data-action="open-advance">结束学年</button>`
+                : status === "approved" && !state.admissions.campaignDone
+                  ? `<button class="btn btn-primary" type="button" data-action="open-campaign">确认招生策略</button>`
+                  : status === "submitted"
+                    ? `<span class="badge">等待审批</span>`
+                    : `<button class="btn btn-outline" type="button" data-action="navigate" data-view="dashboard">查看校务</button>`
             }
           </div>
         </div>
@@ -1198,20 +1814,14 @@ function renderAdmissions() {
 function renderGovernance() {
   const president = state.governance.president;
   const years = state.time.year - state.school.founded;
-  const upgradeTarget = state.school.level === "专科" ? "职业本科" : null;
-  const upgradeRequirements = getUpgradeRequirements(upgradeTarget);
-  const publicRequirements = {
-    years,
-    reputation: state.resources.reputation,
-    quality: state.resources.quality,
-    students: state.resources.students,
-  };
+  const tier = getSchoolTier();
+  const nextTier = nextSchoolTier(tier.id);
   return `
     ${pageHead(
       "INSTITUTION & PEOPLE",
       "校务与师资",
       "聘任、升格与治理方式共同塑造学校。任何一次任命都会进入官网新闻与办学履历。",
-      `<span class="badge badge-gold">${schoolNatureLabel()} · ${state.school.level}</span>`,
+      `<span class="badge badge-gold">${schoolNatureLabel()} · ${escapeHtml(tier.name)}</span>`,
     )}
 
     <div class="dashboard-grid">
@@ -1270,6 +1880,7 @@ function renderGovernance() {
                   ? `<div class="timeline-item"><span>${state.time.year}.09</span><strong>${escapeHtml(president.name)}就任校长</strong><p>${escapeHtml(president.title)}，治校专长：${escapeHtml(president.trait)}。</p></div>`
                   : ""
               }
+              ${(state.tierHistory || []).slice(0, 4).map((item) => `<div class="timeline-item"><span>${item.year}</span><strong>学校层级晋升为${escapeHtml(item.tierName)}</strong><p>${(item.domesticTags || []).length ? `国内标签：${item.domesticTags.map(escapeHtml).join("、")}` : "国内专项标签暂未申请"}${item.internationalTag ? ` · 国际标签：${escapeHtml(item.internationalTag)}` : ""}</p></div>`).join("")}
               ${
                 state.history[0]
                   ? `<div class="timeline-item"><span>${state.history[0].year}.12</span><strong>完成第 ${state.history.length} 学年结算</strong><p>年度结余 ${signedMoney(state.history[0].profit)}。</p></div>`
@@ -1282,41 +1893,25 @@ function renderGovernance() {
 
       <aside class="stack">
         <section class="panel">
-          <div class="panel-head"><div><h3>办学层次升格</h3><p>更名、扩权与学位授予能力</p></div></div>
+          <div class="panel-head"><div><h3>学校层级晋升</h3><p>层级决定学校分数上限与后续发展空间</p></div></div>
           <div class="panel-body">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+              <span class="badge">${escapeHtml(tier.name)}</span>
+              ${nextTier ? `<span class="muted">→</span><span class="badge badge-gold">${escapeHtml(nextTier.name)}</span>` : `<span class="badge badge-gold">已达最高层级</span>`}
+            </div>
+            <div class="check-list">
+              <div class="check-row"><span>省/国分数上限</span><strong>${tier.provincialCap} / 1000</strong></div>
+              <div class="check-row"><span>国际分数上限</span><strong>${tier.internationalCap} / 10000</strong></div>
+            </div>
             ${
-              upgradeTarget
-                ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-                    <span class="badge">${escapeHtml(state.school.level)}</span>
-                    <span class="muted">→</span>
-                    <span class="badge badge-gold">${escapeHtml(upgradeTarget)}</span>
-                  </div>
-                  <div class="requirements">
-                    ${Object.entries(upgradeRequirements).map(([key, req]) => requirementRow(req.label, currentMetricValue(key), req.value, req.unit)).join("")}
-                  </div>
-                  <button class="btn btn-dark" style="width:100%;margin-top:14px" type="button" data-action="apply-upgrade" data-target="${upgradeTarget}">提交升格评估</button>`
-                : `<div class="notice"><span class="notice-icon">研</span><span>${state.school.level === "博士授权" ? "学校已具备博士授予能力，继续通过科研与全球声誉提升榜单位次。" : "学校已完成本科层次升格。硕士、博士学位点请前往“科研与学位”申请。"}</span></div>`
+              nextTier
+                ? `<div class="requirements" style="margin-top:14px">${tierRequirementRows(nextTier.requirements, years)}</div>
+                   <button class="btn btn-dark" style="width:100%;margin-top:14px" type="button" data-action="apply-tier-upgrade" data-tier="${nextTier.id}">申请晋升为${escapeHtml(nextTier.name)}</button>`
+                : `<div class="notice" style="margin-top:14px"><span class="notice-icon">顶</span><span>学校已经达到世界重点本科院校层级。</span></div>`
             }
           </div>
         </section>
 
-        <section class="panel">
-          <div class="panel-head"><div><h3>民办转公办申请</h3><p>办学质量足够高时，教育厅可能收编</p></div></div>
-          <div class="panel-body">
-            ${
-              state.school.nature === "public"
-                ? `<div class="notice"><span class="notice-icon">公</span><span>学校已转为公办。学费收入降低，但获得稳定财政补助，公众信任更高。</span></div>`
-                : `<div class="requirements">
-                    ${requirementRow("连续办学年限", years, 3, "年")}
-                    ${requirementRow("社会声誉", state.resources.reputation, 70, "/ 100")}
-                    ${requirementRow("办学质量", state.resources.quality, 62, "/ 100")}
-                    ${requirementRow("在校学生", formatNumber(state.resources.students), 2000, "人")}
-                  </div>
-                  <button class="btn btn-outline" style="width:100%;margin-top:14px" type="button" data-action="apply-public-conversion">申请转为公办</button>
-                  <p class="method-note">满足条件后仍需接受综合评议，成功率约 45%—75%。可重复申请，但每次失败会影响声誉。</p>`
-            }
-          </div>
-        </section>
       </aside>
     </div>
   `;
@@ -1349,7 +1944,27 @@ function getUpgradeRequirements(target) {
 
 function currentMetricValue(key) {
   if (key === "colleges") return state.colleges.length;
+  if (key === "years") return state.time.year - state.school.founded;
   return state.resources[key] ?? 0;
+}
+
+function tierRequirementRows(requirements = {}, years = 0) {
+  const meta = {
+    students: ["在校学生", "人"],
+    quality: ["办学质量", " / 100"],
+    reputation: ["社会声誉", " / 100"],
+    research: ["科研水平", " / 100"],
+    cash: ["可用资金", " 万"],
+    years: ["连续办学", " 年"],
+    colleges: ["二级学院", " 个"],
+  };
+  return Object.entries(requirements || {})
+    .map(([key, required]) => {
+      const [label, unit] = meta[key] || [key, ""];
+      const current = key === "years" ? years : currentMetricValue(key);
+      return requirementRow(label, formatNumber(current), required, unit);
+    })
+    .join("");
 }
 
 function requirementRow(label, current, required, unit) {
@@ -1687,6 +2302,139 @@ function renderAlumni() {
   `;
 }
 
+function renderFinance() {
+  const tabs = [
+    { id: "bank", label: "银行业务" },
+    { id: "stock", label: "股票账户" },
+  ];
+  const totalLoan = roundScore(state.bank.loans.reduce((sum, loan) => sum + loan.remaining, 0));
+  return `
+    ${pageHead(
+      "FINANCE & INVESTMENT",
+      "银行与投资",
+      "存款、贷款与股票投资都与学校可用资金分开管理，所有流水会写入存档。",
+      `<span class="badge badge-gold">信用 ${state.bank.credit}</span>`,
+    )}
+    <div class="tabs" role="tablist">
+      ${tabs.map((tab) => `<button class="tab ${ui.financeTab === tab.id ? "active" : ""}" type="button" data-action="finance-tab" data-tab="${tab.id}">${tab.label}</button>`).join("")}
+    </div>
+    ${ui.financeTab === "bank" ? renderBankTab(totalLoan) : renderStockTab()}
+  `;
+}
+
+function renderBankTab(totalLoan) {
+  return `
+    <div class="metric-grid">
+      ${metricCard("活期存款", `${formatMoney(state.bank.demand)}`, "存", "", "银行账户", "可随时存取", "var(--teal-soft)", "var(--green)")}
+      ${metricCard("定期存单", `${state.bank.fixed.length}<small>笔</small>`, "定", "", "到期结息", "3 / 6 / 12 个月", "var(--blue-soft)", "var(--blue)")}
+      ${metricCard("贷款余额", `${formatMoney(totalLoan)}`, "贷", "", "信用融资", "按月自动还款", "var(--red-soft)", "var(--red)")}
+      ${metricCard("信用评分", `${state.bank.credit}<small>/ 100</small>`, "信", "", "影响贷款额度", "按时还款提升", "var(--gold-soft)", "#8a6322")}
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="stack">
+        <section class="panel">
+          <div class="panel-head"><div><h3>定期存款</h3><p>到期自动转入活期账户</p></div><button class="btn btn-outline btn-sm" data-action="open-deposit">存入资金</button></div>
+          <div class="panel-body">
+            ${
+              state.bank.fixed.length
+                ? state.bank.fixed.map((deposit) => `<div class="person-card" style="margin-bottom:8px"><div class="avatar">定</div><div class="person-copy"><strong>${formatMoney(deposit.principal)}</strong><span>${deposit.termMonths} 个月 · 剩余 ${deposit.monthsLeft} 个月 · 年化 ${(deposit.annualRate * 100).toFixed(2)}%</span></div><span class="status-pill status-info">存续中</span></div>`).join("")
+                : `<div class="empty-state" style="min-height:140px;padding:18px"><div><div class="empty-icon">定</div><h3>暂无定期存款</h3><p>定期利率高于活期，但到期前不可支取。</p></div></div>`
+            }
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><div><h3>贷款</h3><p>信用与还款记录影响后续额度</p></div><div style="display:flex;gap:7px"><button class="btn btn-outline btn-sm" data-action="open-repay">提前还款</button><button class="btn btn-dark btn-sm" data-action="open-loan">申请贷款</button></div></div>
+          <div class="panel-body">
+            ${
+              state.bank.loans.length
+                ? state.bank.loans.map((loan) => `<div class="person-card" style="margin-bottom:8px"><div class="avatar soft">贷</div><div class="person-copy"><strong>剩余 ${formatMoney(loan.remaining)}</strong><span>${loan.monthsLeft} 个月 · 年化 ${(loan.annualRate * 100).toFixed(2)}% · 逾期 ${loan.overdue} 次</span></div><span class="status-pill ${loan.overdue ? "status-danger" : "status-info"}">${loan.overdue ? "有逾期" : "正常"}</span></div>`).join("")
+                : `<div class="notice"><span class="notice-icon">贷</span><span>当前无贷款。贷款资金会立即进入学校可用资金。</span></div>`
+            }
+          </div>
+        </section>
+      </div>
+
+      <aside class="stack">
+        <section class="panel">
+          <div class="panel-head"><div><h3>活期账户</h3><p>按月结息 · 年化 0.35%</p></div></div>
+          <div class="panel-body">
+            <div class="approval-gauge"><div class="big-num">${formatMoney(state.bank.demand)}</div><div><strong>当前活期余额</strong><p>支取后立即回到学校可用资金。</p></div></div>
+            <button class="btn btn-outline" style="width:100%;margin-top:12px" data-action="open-withdraw">支取活期</button>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><div><h3>最近流水</h3><p>最近 6 笔</p></div></div>
+          <div class="panel-body">
+            <div class="feed-list">
+              ${state.bank.transactions.slice(0, 6).map((item) => `<div class="feed-item"><div class="feed-date">${escapeHtml(item.date)}<br />${escapeHtml(item.type)}</div><div class="feed-copy"><strong>${escapeHtml(item.note)}</strong><span>${formatMoney(item.amount)}</span></div></div>`).join("") || `<div class="notice">暂无银行流水</div>`}
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  `;
+}
+
+function renderStockTab() {
+  const locked = state.school.nature === "public";
+  const totalValue = Object.entries(state.stock.holdings).reduce((sum, [symbol, holding]) => {
+    return sum + holding.shares * (state.stock.prices[symbol] || 0);
+  }, 0);
+  return `
+    <div class="metric-grid">
+      ${metricCard("股票账户", `${formatMoney(state.stock.cash)}`, "股", "", "投资账户", "与学校资金分账", "var(--teal-soft)", "var(--green)")}
+      ${metricCard("持仓市值", `${formatMoney(roundScore(totalValue))}`, "持", "", "当前市值", "浮动盈亏", "var(--blue-soft)", "var(--blue)")}
+      ${metricCard("已实现盈亏", `${formatMoney(state.stock.realized)}`, "盈", "", "已平仓", "交易手续费已扣", "var(--gold-soft)", "#8a6322")}
+      ${metricCard("股票数量", `${STOCK_MARKET.length}<small>只</small>`, "只", "", "虚构标的", "月度更新", "var(--violet-soft)", "var(--violet)")}
+    </div>
+
+    <div class="dashboard-grid">
+      <section class="panel">
+        <div class="panel-head"><div><h3>虚拟市场行情</h3><p>每月自动更新一次，涨跌幅限制 ±12%</p></div><button class="btn btn-outline btn-sm" data-action="open-stock-transfer">账户转账</button></div>
+        <div class="panel-body flush">
+          <div class="rank-table-wrap">
+            <table class="rank-table">
+              <thead><tr><th>股票</th><th>行业</th><th>现价</th><th>持仓</th><th>操作</th></tr></thead>
+              <tbody>
+                ${STOCK_MARKET.map((stock) => {
+                  const price = state.stock.prices[stock.symbol] || stock.basePrice;
+                  const holding = state.stock.holdings[stock.symbol];
+                  return `<tr><td><span class="uni-name">${escapeHtml(stock.name)}</span><span class="mono"> ${stock.symbol}</span></td><td>${escapeHtml(stock.sector)}</td><td class="mono">${price.toFixed(2)}</td><td>${holding ? `${holding.shares} 股` : "—"}</td><td><button class="btn btn-sm btn-outline" data-action="open-stock-order" data-symbol="${stock.symbol}" data-side="buy" ${locked ? "disabled" : ""}>买入</button> <button class="btn btn-sm btn-ghost" data-action="open-stock-order" data-symbol="${stock.symbol}" data-side="sell" ${locked ? "disabled" : ""}>卖出</button></td></tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+          </div>
+          ${
+            locked
+              ? `<div class="notice" style="margin:13px"><span class="notice-icon">公</span><span>公办学校资金不得进入股票市场，股票交易已锁定。</span></div>`
+              : ""
+          }
+        </div>
+      </section>
+
+      <aside class="stack">
+        <section class="panel">
+          <div class="panel-head"><div><h3>我的持仓</h3><p>成本与浮动盈亏</p></div></div>
+          <div class="panel-body">
+            ${
+              Object.keys(state.stock.holdings).length
+                ? Object.entries(state.stock.holdings).map(([symbol, holding]) => {
+                    const stock = STOCK_MARKET.find((item) => item.symbol === symbol);
+                    const price = state.stock.prices[symbol] || 0;
+                    const avgCost = holding.shares ? holding.cost / holding.shares : 0;
+                    return `<div class="person-card" style="margin-bottom:8px"><div class="avatar">股</div><div class="person-copy"><strong>${escapeHtml(stock?.name || symbol)} · ${holding.shares} 股</strong><span>成本 ${avgCost.toFixed(2)} · 现价 ${price.toFixed(2)}</span></div><span class="badge ${price >= avgCost ? "status-success" : "status-danger"}">${price >= avgCost ? "盈利" : "亏损"}</span></div>`;
+                  }).join("")
+                : `<div class="empty-state" style="min-height:140px;padding:18px"><div><div class="empty-icon">股</div><h3>暂无持仓</h3><p>先转账到股票账户，再买入虚拟股票。</p></div></div>`
+            }
+          </div>
+        </section>
+      </aside>
+    </div>
+  `;
+}
+
 function renderRankings(ranks) {
   const tabs = [
     { id: "sichuan", label: "四川省高校榜" },
@@ -1696,72 +2444,98 @@ function renderRankings(ranks) {
   let rows = [];
   let title = "";
   let subtitle = "";
+  const playerDomestic = playerDomesticTags();
+  const playerInternational = playerInternationalTag();
+  const scoreScaleMax = ui.rankingTab === "world" ? 10000 : 1000;
   if (ui.rankingTab === "sichuan") {
     rows = [
-      ...SICHUAN_UNIVERSITIES.map((item) => ({ ...item })),
+      ...SICHUAN_UNIVERSITIES.map((item) => ({
+        ...item,
+        score: state.ranking.npc.sichuan[item.name],
+        domesticTags: getDomesticTags(item.name),
+      })),
       {
         name: state.school.name,
-        city: state.school.city,
-        score: schoolStrength(),
+        city: state.school.city.replace(/市$/, ""),
+        score: ranks.player.provincial,
         rank: ranks.provincial,
         you: true,
+        domesticTags: playerDomestic,
       },
     ]
       .sort((a, b) => b.score - a.score)
       .map((item, index) => ({ ...item, rank: index + 1 }));
     title = "四川省高校综合榜";
-    subtitle = "四川高校真实校名 + 模拟办学表现，本校会自动插入榜单";
+    subtitle = "1000 分制 · 四川高校真实校名 + 模拟办学表现";
   } else if (ui.rankingTab === "national") {
     rows = [
-      ...NATIONAL_UNIVERSITIES.map((item) => ({ ...item })),
+      ...NATIONAL_UNIVERSITIES.map((item) => ({
+        ...item,
+        score: state.ranking.npc.national[item.name],
+        domesticTags: getDomesticTags(item.name),
+      }))
+        .sort((a, b) => b.score - a.score)
+        .map((item, index) => ({ ...item, rank: index + 1 })),
       {
         name: state.school.name,
-        city: state.school.city,
-        score: schoolStrength(),
+        city: state.school.city.replace(/市$/, ""),
+        score: ranks.player.national,
         rank: ranks.national,
         you: true,
+        domesticTags: playerDomestic,
       },
     ];
     title = "中国大学综合榜 · 前 100";
-    subtitle = "使用真实高校名称与模拟评价分数；本校未进入前 100 时显示预估全国位次";
+    subtitle = "1000 分制 · 全国名次与 NPC 分数每学年更新一次";
   } else {
     rows = [
-      ...WORLD_UNIVERSITIES.map((item) => ({ ...item })),
+      ...WORLD_UNIVERSITIES.map((item) => ({
+        ...item,
+        score: state.ranking.npc.world[item.name],
+        internationalTag: getInternationalTag(item.name),
+      }))
+        .sort((a, b) => b.score - a.score)
+        .map((item, index) => ({ ...item, rank: index + 1 })),
       {
         name: state.school.name,
         country: "中国",
-        score: schoolStrength(),
+        score: ranks.player.world,
         rank: ranks.world,
         you: true,
+        internationalTag: playerInternational,
       },
     ];
     title = "世界大学综合榜";
-    subtitle = "世界名校名称 + 模拟评价维度，本校以预估世界位次呈现";
+    subtitle = "10000 分制 · 国际榜只显示最高国际标签";
   }
 
   return `
     ${pageHead(
       "RANKINGS & BENCHMARKS",
       "大学排行榜",
-      "排名中心将省榜、全国榜与世界榜放在同一套办学数据下观察。所有位次与分数均为游戏模拟，不代表任何官方榜单。",
+      `榜单每学年结算更新一次。省榜与全国榜使用 1000 分制，国际榜使用 10000 分制；当前更新于 ${ranks.updatedYear} 年。`,
       `<button class="btn btn-outline btn-sm" type="button" data-action="open-ranking-method">查看计分方法</button>`,
     )}
 
     <div class="ranking-summary">
       <div class="rank-summary-card ${ui.rankingTab === "sichuan" ? "active" : ""}" data-action="ranking-tab" data-tab="sichuan" role="button" tabindex="0">
-        <span>四川省 · 模拟位次</span><strong>第 ${ranks.provincial} 位</strong><small>省内本科与职业院校综合观察</small>
+        <span>四川省 · 模拟位次</span><strong>第 ${ranks.provincial} 位</strong><small>省榜分数 ${ranks.player.provincial.toFixed(1)} / 1000</small>
       </div>
       <div class="rank-summary-card ${ui.rankingTab === "national" ? "active" : ""}" data-action="ranking-tab" data-tab="national" role="button" tabindex="0">
-        <span>全国 · 预估位次</span><strong>第 ${formatNumber(ranks.national)} 位</strong><small>综合实力 ${ranks.strength.toFixed(1)} / 100</small>
+        <span>全国 · 预估位次</span><strong>第 ${formatNumber(ranks.national)} 位</strong><small>全国分数 ${ranks.player.national.toFixed(1)} / 1000</small>
       </div>
       <div class="rank-summary-card ${ui.rankingTab === "world" ? "active" : ""}" data-action="ranking-tab" data-tab="world" role="button" tabindex="0">
-        <span>世界 · 预估位次</span><strong>第 ${formatNumber(ranks.world)} 位</strong><small>声誉与科研的国际映射</small>
+        <span>世界 · 预估位次</span><strong>第 ${formatNumber(ranks.world)} 位</strong><small>国际分数 ${ranks.player.world.toFixed(1)} / 10000</small>
       </div>
     </div>
 
     <section class="panel">
       <div class="panel-head" style="align-items:center">
-        <div><h3>${title}</h3><p>${subtitle}</p></div>
+            <div>
+              <h3>${title}</h3>
+              <p>${subtitle}</p>
+              <div class="ranking-tier-line">本校：${escapeHtml(ranks.tier.name)} · 省/国上限 ${ranks.tier.provincialCap} · 国际上限 ${ranks.tier.internationalCap}</div>
+            </div>
         <div class="segmented">
           ${tabs.map((tab) => `<button class="${ui.rankingTab === tab.id ? "active" : ""}" type="button" data-action="ranking-tab" data-tab="${tab.id}">${tab.label}</button>`).join("")}
         </div>
@@ -1769,7 +2543,7 @@ function renderRankings(ranks) {
       <div class="panel-body flush">
         <div class="rank-table-wrap">
           <table class="rank-table">
-            <thead><tr><th>位次</th><th>高校</th><th>${ui.rankingTab === "world" ? "国家/地区" : "城市"}</th><th>模拟得分</th><th>评价</th></tr></thead>
+            <thead><tr><th>位次</th><th>高校</th><th>标签</th><th>${ui.rankingTab === "world" ? "国家/地区" : "城市"}</th><th>模拟得分 / ${scoreScaleMax}</th><th>评价</th></tr></thead>
             <tbody>
               ${rows
                 .map(
@@ -1777,9 +2551,10 @@ function renderRankings(ranks) {
                     <tr class="${item.you ? "you" : ""}">
                       <td class="rank-number">${String(item.rank).padStart(2, "0")}</td>
                       <td><span class="uni-name">${escapeHtml(item.name)}</span>${item.you ? ` <span class="badge badge-gold">本校</span>` : ""}</td>
+                      <td>${renderUniversityTags(item)}</td>
                       <td>${escapeHtml(item.country || item.city || "—")}</td>
                       <td class="mono">${Number(item.score).toFixed(1)}</td>
-                      <td><div class="score-bar"><div class="score-bar-track"><div class="score-bar-fill" style="width:${item.score}%"></div></div><span class="mono">${Math.round(item.score)}</span></div></td>
+                      <td><div class="score-bar"><div class="score-bar-track"><div class="score-bar-fill" style="width:${clamp((item.score / scoreScaleMax) * 100, 0, 100)}%"></div></div><span class="mono">${Math.round(item.score)}</span></div></td>
                     </tr>
                   `,
                 )
@@ -1789,8 +2564,18 @@ function renderRankings(ranks) {
         </div>
       </div>
     </section>
-    <p class="method-note">榜单仅用于本游戏的模拟经营反馈。真实大学的名称用于建立参照感，分数、名次和评价均为虚构。本校省榜位次会随“办学质量、科研、声誉、就业、学生满意度”变化。</p>
+    <p class="method-note">榜单名次只在年度结算时刷新；NPC 分数也会逐年增长。国内榜叠加展示 985、211、双一流标签，国际榜只展示最高国际标签。所有分数和名次均为游戏模拟。</p>
   `;
+}
+
+function renderUniversityTags(item) {
+  const tags = Array.isArray(item.domesticTags)
+    ? item.domesticTags
+    : item.internationalTag
+      ? [item.internationalTag]
+      : [];
+  if (!tags.length) return `<span class="muted">—</span>`;
+  return `<span class="university-tags">${tags.map((tag) => `<span class="uni-tag">${escapeHtml(tag)}</span>`).join("")}</span>`;
 }
 
 function renderWebsite() {
@@ -1798,7 +2583,10 @@ function renderWebsite() {
     state.flags.visitedWebsite = true;
     saveState();
   }
-  const news = state.news.slice(0, 6);
+  const news = state.news.filter(isPublicNews).slice(0, 6);
+  const tier = getSchoolTier();
+  const domesticTags = playerDomesticTags();
+  const internationalTag = playerInternationalTag();
   return `
     ${pageHead(
       "PUBLIC WEBSITE",
@@ -1809,7 +2597,7 @@ function renderWebsite() {
     <div class="browser-frame">
       <div class="browser-bar"><span class="browser-dots"><i></i><i></i><i></i></span><div class="browser-url">https://www.${escapeHtml(state.school.name.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, "").slice(0, 12) || "qinghe")}.edu.cn</div><span class="mono" style="font-size:8px">HTTPS</span></div>
       <div class="university-site">
-        <div class="site-utility"><span>${escapeHtml(state.school.name)} · 四川省 · ${schoolNatureLabel()}全日制普通高等学校</span><span>${state.time.year}年10月26日</span></div>
+        <div class="site-utility"><span>${escapeHtml(state.school.name)} · 四川省 · ${schoolNatureLabel()} · ${escapeHtml(tier.name)}</span><span>${state.time.year}年10月26日</span></div>
         <header class="site-header">
           <div class="site-brand"><div class="site-emblem">${escapeHtml(state.school.badge)}</div><div><strong>${escapeHtml(state.school.name)}</strong><small>QINGHE UNIVERSITY · 求真 · 力行</small></div></div>
           <nav class="site-nav"><span>学校概况</span><span>院系设置</span><span>招生就业</span><span>科学研究</span><span>校园生活</span><span>信息公开</span></nav>
@@ -1855,7 +2643,9 @@ function renderWebsite() {
                 <div class="check-row"><span>在校学生</span><strong>${formatNumber(state.resources.students)} 人</strong></div>
                 <div class="check-row"><span>专任教师</span><strong>${state.resources.faculty} 人</strong></div>
                 <div class="check-row"><span>开设专业</span><strong>${getPrograms().length} 个</strong></div>
-                <div class="check-row"><span>办学层次</span><strong>${escapeHtml(state.school.level)}</strong></div>
+                <div class="check-row"><span>学校层级</span><strong>${escapeHtml(tier.name)}</strong></div>
+                <div class="check-row"><span>国内标签</span><strong>${domesticTags.length ? domesticTags.map(escapeHtml).join(" · ") : "暂未申请"}</strong></div>
+                <div class="check-row"><span>国际标签</span><strong>${internationalTag ? escapeHtml(internationalTag) : "暂未获得"}</strong></div>
               </div>
             </div>
           </aside>
@@ -1908,6 +2698,13 @@ function getModalContent(type, ctx) {
   if (type === "tutorial") return modalTutorial();
   if (type === "save-menu") return modalSaveMenu();
   if (type === "changelog") return modalChangelog();
+  if (type === "notification") return modalNotification();
+  if (type === "deposit") return modalDeposit();
+  if (type === "withdraw") return modalWithdraw();
+  if (type === "loan") return modalLoan();
+  if (type === "repay") return modalRepay();
+  if (type === "stock-transfer") return modalStockTransfer();
+  if (type === "stock-order") return modalStockOrder(ctx);
   if (type === "initial-college") return modalCollegeChoice(true);
   if (type === "add-college") return modalCollegeChoice(false);
   if (type === "add-program") return modalAddProgram(ctx);
@@ -1960,6 +2757,7 @@ function modalTutorial() {
 }
 
 function modalSaveMenu() {
+  const mutedTypes = Object.entries(state.notifications.muted).filter(([, value]) => value);
   return {
     size: "narrow",
     html: `
@@ -1972,6 +2770,12 @@ function modalSaveMenu() {
         </div>
         <div class="notice" style="margin-bottom:12px"><span class="notice-icon">版</span><span>当前版本 v${APP_VERSION} · 数据仅保存在当前浏览器本地。</span></div>
         <button class="btn btn-outline" style="width:100%;margin-bottom:12px" type="button" data-action="open-changelog">查看 v${APP_VERSION} 更新内容</button>
+        <div class="notice" style="margin-bottom:12px"><span class="notice-icon">铃</span><span>已关闭的通知类型可在此重新开启。</span></div>
+        ${
+          mutedTypes.length
+            ? mutedTypes.map(([type]) => `<div class="check-row" style="margin-bottom:8px"><span>${notificationTypeLabel(type)}</span><button class="btn btn-outline btn-sm" type="button" data-action="unmute-notification" data-type="${type}">重新开启</button></div>`).join("")
+            : `<div class="check-row"><span>通知状态</span><strong>全部开启</strong></div>`
+        }
         <div class="form-grid">
           <button class="btn btn-outline" type="button" data-action="export-save">导出存档</button>
           <button class="btn btn-outline" type="button" data-action="return-title">返回标题页</button>
@@ -1991,17 +2795,337 @@ function modalChangelog() {
       <div class="modal-body">
         <div class="notice" style="margin-bottom:15px">
           <span class="notice-icon">版</span>
-          <span>本次更新重点修复学院专业归属、招生配额、排名与手机端操作问题。</span>
+          <span>按版本查看更新记录，最新版本默认展开。</span>
         </div>
-        <ul class="changelog-list">
-          ${CHANGELOG.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-        </ul>
+        <div class="changelog-versions">
+          ${CHANGELOG.map(
+            (release, index) => `
+              <details class="changelog-version" ${index === 0 ? "open" : ""}>
+                <summary>
+                  <span class="changelog-version-name">${escapeHtml(release.version)}</span>
+                  <span class="changelog-version-meta">${escapeHtml(release.date)} · ${escapeHtml(release.summary)}</span>
+                </summary>
+                <ul class="changelog-list">
+                  ${release.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                </ul>
+              </details>
+            `,
+          ).join("")}
+        </div>
       </div>
       <div class="modal-foot">
         <button class="btn btn-dark" type="button" data-action="close-modal">知道了</button>
       </div>
     `,
   };
+}
+
+function modalNotification() {
+  const notification = state.notifications.queue[0];
+  if (!notification) return null;
+  return {
+    size: "narrow",
+    html: `
+      ${modalHeader(notification.title, "重要校务通知 · 时间已自动暂停")}
+      <div class="modal-body">
+        <div class="modal-callout info">${escapeHtml(notification.detail)}</div>
+        <label class="notice-line" style="align-items:center">
+          <input type="checkbox" id="notification-mute" /> 不再通知此类消息
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-outline" type="button" data-action="notification-skip">跳过</button>
+        <button class="btn btn-primary" type="button" data-action="notification-handle">去处理</button>
+      </div>
+    `,
+  };
+}
+
+function handleNotification(action) {
+  const notification = state.notifications.queue.shift();
+  if (!notification) return;
+  const mute = document.querySelector("#notification-mute")?.checked;
+  if (mute) state.notifications.muted[notification.type] = true;
+  if (notification.type === "settlement") settleYear();
+  closeModal();
+  if (action === "handle") {
+    ui.view = notification.view || "dashboard";
+    saveState();
+    renderApp();
+    return;
+  }
+  if (state.notifications.queue.length) {
+    saveState();
+    renderApp();
+    openModal("notification");
+    return;
+  }
+  state.time.running = true;
+  state.time.speed = state.notifications.resumedSpeed || 1;
+  clockAccumulatorMs = 0;
+  clockLastMs = Date.now();
+  saveState();
+  renderApp();
+}
+
+function modalDeposit() {
+  return {
+    size: "narrow",
+    html: `
+      ${modalHeader("银行存款", "存入的定期存款在到期前不可使用")}
+      <form id="finance-deposit-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field"><label>存款金额（万元）</label><input class="input" type="number" name="amount" min="1" required /></div>
+            <div class="field">
+              <label>存款类型</label>
+              <select class="select" name="type">
+                <option value="demand">活期 · 年化 0.35%</option>
+                <option value="3">3 个月定期 · 年化 1.10%</option>
+                <option value="6">6 个月定期 · 年化 1.30%</option>
+                <option value="12">12 个月定期 · 年化 1.55%</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-callout" style="margin-top:14px">存款资金从学校可用资金转入，支出时需提前支取或等待到期。</div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-ghost" type="button" data-action="close-modal">取消</button><button class="btn btn-primary" type="submit">确认存入</button></div>
+      </form>
+    `,
+  };
+}
+
+function modalWithdraw() {
+  return {
+    size: "narrow",
+    html: `
+      ${modalHeader("支取活期存款", `当前活期余额 ${formatMoney(state.bank.demand)}`)}
+      <form id="finance-withdraw-form">
+        <div class="modal-body">
+          <div class="field"><label>支取金额（万元）</label><input class="input" type="number" name="amount" min="1" required /></div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-ghost" type="button" data-action="close-modal">取消</button><button class="btn btn-primary" type="submit">确认支取</button></div>
+      </form>
+    `,
+  };
+}
+
+function modalLoan() {
+  return {
+    size: "narrow",
+    html: `
+      ${modalHeader("申请贷款", `信用评分 ${state.bank.credit} · 基准年化 ${(BANK_RATES.loanBaseRate * 100).toFixed(1)}%`)}
+      <form id="finance-loan-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field"><label>贷款金额（万元）</label><input class="input" type="number" name="amount" min="1" required /></div>
+            <div class="field"><label>贷款期限</label><select class="select" name="months"><option value="3">3 个月</option><option value="6">6 个月</option><option value="12">12 个月</option><option value="24">24 个月</option></select></div>
+          </div>
+          <div class="modal-callout danger" style="margin-top:14px">贷款按月自动还款；现金不足会形成逾期并降低信用。</div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-ghost" type="button" data-action="close-modal">取消</button><button class="btn btn-primary" type="submit">确认贷款</button></div>
+      </form>
+    `,
+  };
+}
+
+function modalRepay() {
+  const total = state.bank.loans.reduce((sum, loan) => sum + loan.remaining, 0);
+  return {
+    size: "narrow",
+    html: `
+      ${modalHeader("提前还款", `剩余贷款本金 ${formatMoney(roundScore(total))}`)}
+      <form id="finance-repay-form">
+        <div class="modal-body">
+          <div class="field"><label>还款金额（万元）</label><input class="input" type="number" name="amount" min="1" required /></div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-ghost" type="button" data-action="close-modal">取消</button><button class="btn btn-primary" type="submit">确认还款</button></div>
+      </form>
+    `,
+  };
+}
+
+function modalStockTransfer() {
+  return {
+    size: "narrow",
+    html: `
+      ${modalHeader("股票账户资金", `股票账户 ${formatMoney(state.stock.cash)} · 学校可用 ${formatMoney(state.resources.cash)}`)}
+      <form id="stock-transfer-form">
+        <div class="modal-body">
+          <div class="field"><label>方向</label><select class="select" name="direction"><option value="in">学校资金转入股票账户</option><option value="out">股票账户转回学校</option></select></div>
+          <div class="field" style="margin-top:12px"><label>金额（万元）</label><input class="input" type="number" name="amount" min="1" required /></div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-ghost" type="button" data-action="close-modal">取消</button><button class="btn btn-primary" type="submit">确认转账</button></div>
+      </form>
+    `,
+  };
+}
+
+function modalStockOrder(ctx) {
+  const stock = STOCK_MARKET.find((item) => item.symbol === ctx.symbol);
+  if (!stock) return null;
+  const price = state.stock.prices[stock.symbol] || stock.basePrice;
+  return {
+    size: "narrow",
+    html: `
+      ${modalHeader(`${ctx.side === "buy" ? "买入" : "卖出"} ${escapeHtml(stock.name)}`, `当前价格 ${price.toFixed(2)} 万元 / 股`)}
+      <form id="stock-order-form">
+        <input type="hidden" name="symbol" value="${stock.symbol}" />
+        <input type="hidden" name="side" value="${ctx.side}" />
+        <div class="modal-body">
+          <div class="field"><label>股数</label><input class="input" type="number" name="shares" min="1" required /></div>
+          <div class="modal-callout info" style="margin-top:14px">交易手续费为成交额的 0.1%。</div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-ghost" type="button" data-action="close-modal">取消</button><button class="btn btn-primary" type="submit">确认${ctx.side === "buy" ? "买入" : "卖出"}</button></div>
+      </form>
+    `,
+  };
+}
+
+function financeDeposit(formData) {
+  const amount = Math.round(Number(formData.get("amount")) || 0);
+  const type = formData.get("type");
+  if (amount <= 0 || state.resources.cash < amount) {
+    toast("资金不足", "学校可用资金不足。", "error");
+    return;
+  }
+  state.resources.cash = roundScore(state.resources.cash - amount);
+  if (type === "demand") {
+    state.bank.demand = roundScore(state.bank.demand + amount);
+    addBankTransaction("存入", amount, "活期存款");
+  } else {
+    const term = BANK_RATES.fixed.find((item) => String(item.months) === type);
+    state.bank.fixed.push({
+      id: `fd-${Date.now()}`,
+      principal: amount,
+      annualRate: term.annualRate,
+      termMonths: term.months,
+      monthsLeft: term.months,
+    });
+    addBankTransaction("存入", amount, `${term.months}个月定期`);
+  }
+  commit();
+  toast("存款完成", "资金已转入银行。", "success");
+}
+
+function financeWithdraw(formData) {
+  const amount = Math.round(Number(formData.get("amount")) || 0);
+  if (amount <= 0 || state.bank.demand < amount) {
+    toast("余额不足", "活期余额不足。", "error");
+    return;
+  }
+  state.bank.demand = roundScore(state.bank.demand - amount);
+  state.resources.cash = roundScore(state.resources.cash + amount);
+  addBankTransaction("支取", amount, "活期支取");
+  commit();
+  toast("支取完成", "资金已转回学校账户。", "success");
+}
+
+function financeLoan(formData) {
+  const amount = Math.round(Number(formData.get("amount")) || 0);
+  const months = Number(formData.get("months"));
+  if (amount <= 0) {
+    toast("金额无效", "请输入贷款金额。", "error");
+    return;
+  }
+  const spread = BANK_RATES.loanSpreadMin + (1 - state.bank.credit / 100) * (BANK_RATES.loanSpreadMax - BANK_RATES.loanSpreadMin);
+  const annualRate = BANK_RATES.loanBaseRate + spread;
+  state.resources.cash = roundScore(state.resources.cash + amount);
+  state.bank.loans.push({
+    id: `loan-${Date.now()}`,
+    remaining: amount,
+    monthsLeft: months,
+    monthlyPrincipal: amount / months,
+    annualRate,
+    overdue: 0,
+    penalty: 0,
+  });
+  addBankTransaction("放款", amount, `贷款 ${months} 个月`);
+  commit();
+  toast("贷款到账", `年化利率 ${(annualRate * 100).toFixed(2)}%。`, "success");
+}
+
+function financeRepay(formData) {
+  let amount = Math.round(Number(formData.get("amount")) || 0);
+  if (amount <= 0 || state.resources.cash < amount) {
+    toast("资金不足", "学校可用资金不足。", "error");
+    return;
+  }
+  state.resources.cash = roundScore(state.resources.cash - amount);
+  state.bank.loans.forEach((loan) => {
+    if (amount <= 0 || loan.remaining <= 0) return;
+    const paid = Math.min(amount, loan.remaining);
+    loan.remaining = roundScore(loan.remaining - paid);
+    amount -= paid;
+  });
+  state.bank.loans = state.bank.loans.filter((loan) => loan.remaining > 0);
+  addBankTransaction("还款", Math.round(Number(formData.get("amount"))), "提前还款");
+  commit();
+  toast("还款完成", "贷款余额已更新。", "success");
+}
+
+function stockTransfer(formData) {
+  const amount = Math.round(Number(formData.get("amount")) || 0);
+  const direction = formData.get("direction");
+  if (direction === "in") {
+    if (amount <= 0 || state.resources.cash < amount) {
+      toast("资金不足", "学校可用资金不足。", "error");
+      return;
+    }
+    state.resources.cash = roundScore(state.resources.cash - amount);
+    state.stock.cash = roundScore(state.stock.cash + amount);
+  } else {
+    if (amount <= 0 || state.stock.cash < amount) {
+      toast("余额不足", "股票账户余额不足。", "error");
+      return;
+    }
+    state.stock.cash = roundScore(state.stock.cash - amount);
+    state.resources.cash = roundScore(state.resources.cash + amount);
+  }
+  state.stock.transactions.unshift({ id: `st-${Date.now()}`, type: direction === "in" ? "转入" : "转出", amount, date: `${state.time.year}-${state.time.month}` });
+  commit();
+  toast("转账完成", direction === "in" ? "资金已转入股票账户。" : "资金已转回学校。", "success");
+}
+
+function stockOrder(formData) {
+  if (state.school.nature === "public") {
+    toast("公办学校不可炒股", "公办资金不得进入股票市场。", "error");
+    return;
+  }
+  const symbol = formData.get("symbol");
+  const side = formData.get("side");
+  const shares = Math.floor(Number(formData.get("shares")) || 0);
+  const stock = STOCK_MARKET.find((item) => item.symbol === symbol);
+  if (!stock || shares <= 0) return;
+  const price = state.stock.prices[symbol] || stock.basePrice;
+  if (side === "buy") {
+    const cost = roundScore(shares * price * 1.001);
+    if (state.stock.cash < cost) {
+      toast("余额不足", "股票账户资金不足。", "error");
+      return;
+    }
+    state.stock.cash = roundScore(state.stock.cash - cost);
+    const holding = state.stock.holdings[symbol] || { shares: 0, cost: 0 };
+    const totalCost = holding.cost + cost;
+    const totalShares = holding.shares + shares;
+    state.stock.holdings[symbol] = { shares: totalShares, cost: roundScore(totalCost) };
+  } else {
+    const holding = state.stock.holdings[symbol] || { shares: 0, cost: 0 };
+    if (holding.shares < shares) {
+      toast("持仓不足", "可卖股数不足。", "error");
+      return;
+    }
+    const proceeds = roundScore(shares * price * 0.999);
+    const avgCost = holding.shares ? holding.cost / holding.shares : 0;
+    state.stock.cash = roundScore(state.stock.cash + proceeds);
+    state.stock.realized = roundScore(state.stock.realized + (price - avgCost) * shares);
+    holding.shares -= shares;
+    holding.cost = roundScore(holding.shares * avgCost);
+    if (holding.shares <= 0) delete state.stock.holdings[symbol];
+  }
+  state.stock.transactions.unshift({ id: `st-${Date.now()}`, type: side === "buy" ? "买入" : "卖出", symbol, shares, price, date: `${state.time.year}-${state.time.month}` });
+  commit();
+  toast(side === "buy" ? "买入完成" : "卖出完成", `${stock.name} ${shares} 股已成交。`, "success");
 }
 
 function modalCollegeChoice(initial) {
@@ -2113,7 +3237,7 @@ function modalCampaign() {
   return {
     size: "wide",
     html: `
-      ${modalHeader("招生投放", `批复计划 ${formatNumber(state.admissions.approvedTotal)} 人。投多少预算，不一定就招到多少人。`)}
+      ${modalHeader("确认招生策略", `批复计划 ${formatNumber(state.admissions.approvedTotal)} 人。策略确认后，录取结果将在 7 月 1 日公布。`)}
       <form id="campaign-form">
         <div class="modal-body">
           <div class="field" style="margin-bottom:16px">
@@ -2158,7 +3282,7 @@ function modalCampaign() {
         </div>
         <div class="modal-foot">
           <button class="btn btn-ghost" type="button" data-action="close-modal">取消</button>
-          <button class="btn btn-primary" type="submit">确认投放并公布结果</button>
+          <button class="btn btn-primary" type="submit">确认招生策略</button>
         </div>
       </form>
     `,
@@ -2181,11 +3305,11 @@ function modalAdmissionResult() {
           <div class="annual-stat"><span>投放成本</span><strong>${formatMoney(result.cost)}</strong></div>
           <div class="annual-stat"><span>新生质量</span><strong>${result.cohortQuality}</strong></div>
         </div>
-        <div class="modal-callout info">第一学期开始。下一步结束本学年，结算学费收入、师资成本与运营支出，并生成首份排名和官网报道。</div>
+        <div class="modal-callout info">第一学期开始。时间会自动推进，学年结束时将结算学费、成本、排名并生成官网报道。</div>
       </div>
       <div class="modal-foot">
         <button class="btn btn-ghost" type="button" data-action="close-modal">继续整理校务</button>
-        <button class="btn btn-primary" type="button" data-action="open-advance">结束本学年</button>
+        <button class="btn btn-primary" type="button" data-action="navigate" data-view="dashboard">回到校务</button>
       </div>
     `,
   };
@@ -2401,7 +3525,7 @@ function modalRankingMethod() {
           <div class="requirement"><span>就业质量</span><strong>16%</strong></div>
           <div class="requirement"><span>学生满意度</span><strong>12%</strong></div>
         </div>
-        <p class="method-note" style="margin-top:13px">全国、四川省与世界位次由综合指数、办学层次加成换算。真实高校名称用于参照，分数、位次与评价均为虚构。</p>
+        <p class="method-note" style="margin-top:13px">省榜与全国榜使用 1000 分制，国际榜使用 10000 分制。玩家与 NPC 分数每学年结算更新一次，NPC 也会逐年增长。真实高校名称仅用于参照，分数、位次与标签以游戏数据为准。</p>
       </div>
       <div class="modal-foot"><button class="btn btn-dark" type="button" data-action="close-modal">了解</button></div>
     `,
@@ -2573,11 +3697,11 @@ function modalUpgradeResult(ctx) {
     html: `
       <div class="annual-banner" style="border-radius:13px 13px 0 0">
         <small>INSTITUTIONAL REVIEW</small>
-        <h2>${success ? "升格评估通过" : "本轮评估未通过"}</h2>
-        <p>${success ? `学校正式进入“${escapeHtml(ctx.target)}”建设阶段。` : escapeHtml(ctx.reason || "评审认为部分办学指标仍需巩固。")}</p>
+        <h2>${success ? "层级晋升通过" : "本轮评估未通过"}</h2>
+        <p>${success ? `学校正式晋升为“${escapeHtml(ctx.target)}”。` : escapeHtml(ctx.reason || "评审认为部分办学指标仍需巩固。")}</p>
       </div>
       <div class="modal-body">
-        <div class="modal-callout ${success ? "info" : "danger"}">${success ? "新的办学层次会影响全国与全球排名换算，并解锁新的科研和学位点目标。" : "保留现有办学层次，继续提升师资、科研、办学质量与毕业生去向。"}</div>
+        <div class="modal-callout ${success ? "info" : "danger"}">${success ? "学校层级与官网标签已更新；榜单分数和名次将在下一次年度结算时刷新。" : "保留现有层级，继续提升师资、科研、办学质量与毕业生去向。"}</div>
       </div>
       <div class="modal-foot"><button class="btn btn-primary" type="button" data-action="close-modal">知道了</button></div>
     `,
@@ -2682,6 +3806,54 @@ function handleClick(event) {
     case "open-advance":
       openModal("advance");
       break;
+    case "toggle-clock":
+      state.time.running = !state.time.running;
+      clockAccumulatorMs = 0;
+      clockLastMs = Date.now();
+      saveState();
+      renderApp();
+      break;
+    case "set-speed":
+      state.time.speed = Number(actionNode.dataset.speed) || 1;
+      clockAccumulatorMs = 0;
+      clockLastMs = Date.now();
+      saveState();
+      renderApp();
+      break;
+    case "finance-tab":
+      ui.financeTab = actionNode.dataset.tab || "bank";
+      renderApp();
+      break;
+    case "notification-handle":
+      handleNotification("handle");
+      break;
+    case "notification-skip":
+      handleNotification("skip");
+      break;
+    case "unmute-notification":
+      delete state.notifications.muted[actionNode.dataset.type];
+      saveState();
+      renderApp();
+      toast("通知已开启", `${notificationTypeLabel(actionNode.dataset.type)}将重新提醒。`, "success");
+      break;
+    case "open-deposit":
+      openModal("deposit");
+      break;
+    case "open-withdraw":
+      openModal("withdraw");
+      break;
+    case "open-loan":
+      openModal("loan");
+      break;
+    case "open-repay":
+      openModal("repay");
+      break;
+    case "open-stock-transfer":
+      openModal("stock-transfer");
+      break;
+    case "open-stock-order":
+      openModal("stock-order", { symbol: actionNode.dataset.symbol, side: actionNode.dataset.side });
+      break;
     case "confirm-advance":
       settleYear();
       break;
@@ -2701,6 +3873,9 @@ function handleClick(event) {
       break;
     case "apply-upgrade":
       applyUpgrade(actionNode.dataset.target);
+      break;
+    case "apply-tier-upgrade":
+      applyTierUpgrade(actionNode.dataset.tier);
       break;
     case "apply-public-conversion":
       openModal("public-conversion");
@@ -2784,6 +3959,36 @@ function handleSubmit(event) {
   if (form.id === "campaign-form") {
     event.preventDefault();
     runCampaign(new FormData(form));
+    return;
+  }
+  if (form.id === "finance-deposit-form") {
+    event.preventDefault();
+    financeDeposit(new FormData(form));
+    return;
+  }
+  if (form.id === "finance-withdraw-form") {
+    event.preventDefault();
+    financeWithdraw(new FormData(form));
+    return;
+  }
+  if (form.id === "finance-loan-form") {
+    event.preventDefault();
+    financeLoan(new FormData(form));
+    return;
+  }
+  if (form.id === "finance-repay-form") {
+    event.preventDefault();
+    financeRepay(new FormData(form));
+    return;
+  }
+  if (form.id === "stock-transfer-form") {
+    event.preventDefault();
+    stockTransfer(new FormData(form));
+    return;
+  }
+  if (form.id === "stock-order-form") {
+    event.preventDefault();
+    stockOrder(new FormData(form));
     return;
   }
   if (form.id === "headline-form") {
@@ -2987,6 +4192,14 @@ function adjustPlan(programId, delta) {
 function submitAdmissionPlan() {
   const programs = getPrograms();
   const total = planTotal();
+  if (!isAdmissionApplicationWindow()) {
+    toast("招生计划申报已关闭", "本年度申报时间为 1 月 1 日至 4 月 30 日。", "error");
+    return;
+  }
+  if (state.admissions.planStatus === "submitted") {
+    toast("计划正在审核", "当前招生计划已提交，请等待教育局答复。", "info");
+    return;
+  }
   if (!programs.length) {
     toast("没有可申报专业", "请先建立学院与专业。", "error");
     return;
@@ -2999,36 +4212,22 @@ function submitAdmissionPlan() {
     toast("超出本年度新生配额", `本年度最多可招 ${formatNumber(state.admissions.annualQuota || annualAdmissionQuota())} 名新生。`, "error");
     return;
   }
-  const chance = approxApprovalChance();
-  const approved = Math.random() < chance;
-  if (approved) {
-    state.admissions.planStatus = "approved";
-    state.admissions.approvedTotal = total;
-    state.resources.reputation = clamp(state.resources.reputation + 1, 0, 100);
-    addNews(
-      `学校${state.time.year}年招生计划获教育厅批复`,
-      `本年度获批招生 ${formatNumber(total)} 人，覆盖${programs.length}个专业，招生工作正式启动。`,
-      "招生就业",
-    );
-    toast("计划获批", `共批复 ${formatNumber(total)} 人。`, "success");
-  } else {
-    state.admissions.planStatus = "rejected";
-    state.resources.reputation = clamp(state.resources.reputation - 1, 0, 100);
-    addNews(
-      "年度招生计划需进一步完善",
-      "教育厅建议学校优化师资配比与专业结构后重新申报。",
-      "通知公告",
-    );
-    toast("计划未获批准", "可调整人数与办学条件后重新提交。", "error");
+  const submittedAt = { year: state.time.year, month: state.time.month, day: state.time.day };
+  const reviewStartedAt = state.time.month === 1 ? { year: state.time.year, month: 2, day: 1 } : submittedAt;
+  const workdays = Math.floor(randomBetween(10, 26));
+  let decisionAt = addWorkingDays(reviewStartedAt, workdays);
+  if (dateNumber(decisionAt.year, decisionAt.month, decisionAt.day) > dateNumber(state.time.year, 5, 31)) {
+    decisionAt = { year: state.time.year, month: 5, day: 31 };
   }
+  state.admissions.submittedAt = submittedAt;
+  state.admissions.reviewStartedAt = reviewStartedAt;
+  state.admissions.decisionAt = decisionAt;
+  state.admissions.planStatus = "submitted";
+  state.admissions.approvedTotal = 0;
+  state.admissions.campaignDone = false;
   saveState();
   renderApp();
-  openModal("approval-result", {
-    approved,
-    total,
-    programCount: programs.length,
-    reason: approved ? "" : "培养方案、师资承载或招生规模与办学条件匹配度不足。",
-  });
+  toast("招生计划已提交", `预计在 ${formatGameDate(decisionAt)} 前答复。`, "success");
 }
 
 function runCampaign(formData) {
@@ -3059,68 +4258,18 @@ function runCampaign(formData) {
     toast("投放预算不足", `当前方案需要 ${formatMoney(cost)}。`, "error");
     return;
   }
-  const strength = schoolStrength();
-  const yieldRate = clamp(
-    0.54 +
-      strength * 0.0043 +
-      strategy.bonus +
-      reach.bonus +
-      threshold.bonus +
-      randomBetween(-0.055, 0.055),
-    0.45,
-    0.97,
-  );
-  const actual = Math.min(
-    state.admissions.approvedTotal,
-    Math.max(30, Math.round(state.admissions.approvedTotal * yieldRate)),
-  );
-  const cohortQuality = Math.round(
-    clamp(
-      48 +
-        state.resources.quality * 0.28 +
-        state.resources.reputation * 0.2 +
-        strategy.qualityBonus +
-        reach.quality +
-        threshold.quality +
-        randomBetween(-4, 4),
-      34,
-      96,
-    ),
-  );
   state.resources.cash -= cost;
-  state.resources.reputation = clamp(
-    state.resources.reputation + strategy.reputation + (yieldRate > 0.8 ? 2 : 0),
-    0,
-    100,
-  );
-  state.admissions.cohorts.push({
-    year: state.time.year,
-    size: actual,
-    initialSize: actual,
-    quality: cohortQuality,
-  });
-  state.resources.students += actual;
   state.admissions.campaignDone = true;
-  state.admissions.planStatus = "completed";
-  state.admissions.lastResult = {
-    year: state.time.year,
-    planned: state.admissions.approvedTotal,
-    actual,
-    yield: actual / Math.max(1, state.admissions.approvedTotal),
-    cost,
-    cohortQuality,
-    strategy: strategy.name,
-    reach: reach.name,
-  };
-  addNews(
-    `${state.time.year}级新生完成报到`,
-    `学校通过${strategy.name}与${reach.name}招生，实际报到${formatNumber(actual)}人，新生质量指数${cohortQuality}。`,
-    "招生就业",
-  );
+  state.admissions.strategy = formData.get("strategy") || "steady";
+  state.admissions.strategyName = strategy.name;
+  state.admissions.reach = reach.name;
+  state.admissions.threshold = threshold.name;
+  state.admissions.campaignCost = cost;
+  state.admissions.planStatus = "strategy_confirmed";
   saveState();
   renderApp();
-  openModal("admission-result");
-  toast("招生投放完成", `${formatNumber(actual)} 名新生报到。`, "success");
+  closeModal();
+  toast("招生策略已确认", "录取结果将在 7 月 1 日统一公布。", "success");
 }
 
 function choosePresident(candidateId) {
@@ -3209,6 +4358,65 @@ function applyUpgrade(target) {
   });
 }
 
+function applyTierUpgrade(targetTierId) {
+  const currentTier = getSchoolTier();
+  const expectedTier = nextSchoolTier(currentTier.id);
+  const targetTier = SCHOOL_TIERS.find((tier) => tier.id === targetTierId);
+  if (!targetTier || !expectedTier || targetTier.id !== expectedTier.id) {
+    toast("层级申请无效", "只能按顺序申请下一层级。", "error");
+    return;
+  }
+  const missing = Object.entries(targetTier.requirements || {}).filter(
+    ([key, required]) => currentMetricValue(key) < required,
+  );
+  if (missing.length) {
+    toast("层级条件未满足", `还有 ${missing.length} 项关键指标未达标。`, "error");
+    return;
+  }
+  if (state.resources.cash < 200) {
+    toast("资金不足", "层级评估需要预留 200 万元。", "error");
+    return;
+  }
+  state.resources.cash -= 200;
+  const chance = clamp(
+    0.62 +
+      (state.resources.quality - 50) * 0.006 +
+      (state.resources.reputation - 50) * 0.004 +
+      schoolStrength() * 0.002,
+    0.5,
+    0.92,
+  );
+  const success = Math.random() < chance;
+  if (success) {
+    const oldTier = currentTier.name;
+    state.school.tier = targetTier.id;
+    state.school.nature = targetTier.nature;
+    state.resources.reputation = clamp(state.resources.reputation + 4, 0, 100);
+    state.tierHistory = state.tierHistory || [];
+    state.tierHistory.unshift({
+      year: state.time.year,
+      tierName: targetTier.name,
+      domesticTags: targetTier.domesticTags,
+      internationalTag: targetTier.internationalTag,
+    });
+    const transfer = currentTier.nature === "private" && targetTier.nature === "public";
+    addNews(
+      transfer ? `${state.school.name}转设为${targetTier.name}` : `学校获批晋升为${targetTier.name}`,
+      `学校由${oldTier}晋升为${targetTier.name}，省/国分数上限提升至${targetTier.provincialCap}，国际分数上限提升至${targetTier.internationalCap}。`,
+      "学校要闻",
+    );
+  } else {
+    state.resources.reputation = clamp(state.resources.reputation - 2, 0, 100);
+  }
+  saveState();
+  renderApp();
+  openModal("upgrade-result", {
+    success,
+    target: targetTier.name,
+    reason: success ? "" : "评议认为学校仍需进一步夯实师资、科研与毕业生发展质量。",
+  });
+}
+
 function applyPublicConversion() {
   if (state.school.nature === "public") return;
   if (
@@ -3242,7 +4450,7 @@ function applyPublicConversion() {
     toast("转设申请获批", "学校正式进入公办序列。", "success");
   } else {
     state.resources.reputation = clamp(state.resources.reputation - 3, 0, 100);
-    addNews("学校公办转设申请完成评议", "综合评议认为办学质量已有基础，仍需进一步优化治理结构与学位建设。", "通知公告");
+    addNews("学校公办转设申请完成评议", "综合评议认为办学质量已有基础，仍需进一步优化治理结构与学位建设。", "通知公告", null, false);
     commit();
     toast("本轮评议未获批准", "可继续积累办学质量，下一学年再次申请。", "error");
   }
@@ -3309,7 +4517,7 @@ function applyDegree(degree) {
     toast("学位点申请通过", `学校进入${state.school.level}阶段。`, "success");
   } else {
     state.resources.reputation = clamp(state.resources.reputation - 1, 0, 100);
-    addNews("学位点评审结果公布", "本轮学位点评审未获通过，学校将根据专家意见继续加强师资与科研平台建设。", "通知公告");
+    addNews("学位点评审结果公布", "本轮学位点评审未获通过，学校将根据专家意见继续加强师资与科研平台建设。", "通知公告", null, false);
     toast("本轮学位点评审未通过", "保持现有办学层次，继续积累科研能力。", "error");
   }
   commit({ scrollTop: true });
@@ -3479,29 +4687,19 @@ function holdAlumniDay() {
   toast("校友返校日成功举办", `募集发展基金 ${formatMoney(donation)}。`, "success");
 }
 
-function settleYear() {
+function settleYear({ silent = false } = {}) {
   closeModal();
   const year = state.time.year;
   const diff = difficultyData();
-  let graduated = 0;
   const cohortNotes = [];
-  const nextCohorts = [];
   state.admissions.cohorts.forEach((cohort) => {
     const age = year - cohort.year;
-    if (age >= 4) {
-      graduated += cohort.size;
-      cohortNotes.push(`${cohort.year}级 ${formatNumber(cohort.size)} 人毕业`);
-    } else {
-      const attrition = age >= 1 ? Math.max(1, Math.round(cohort.size * 0.035)) : 0;
-      const size = Math.max(0, cohort.size - attrition);
-      nextCohorts.push({ ...cohort, size });
-      if (attrition) cohortNotes.push(`${cohort.year}级自然流失 ${formatNumber(attrition)} 人`);
-    }
+    const attrition = age >= 1 ? Math.max(1, Math.round(cohort.size * 0.035)) : 0;
+    cohort.size = Math.max(0, cohort.size - attrition);
+    if (attrition) cohortNotes.push(`${cohort.year}级自然流失 ${formatNumber(attrition)} 人`);
   });
-  state.admissions.cohorts = nextCohorts;
   const students = state.admissions.cohorts.reduce((sum, cohort) => sum + cohort.size, 0);
   state.resources.students = students;
-  state.resources.alumni += graduated;
 
   const tuition = state.school.nature === "public" ? 0.72 : 1.65;
   const publicGrant = state.school.nature === "public" ? 0.9 : 0.12;
@@ -3588,7 +4786,7 @@ function settleYear() {
   state.resources.reputation = clamp(state.resources.reputation + (annualEvent.reputation || 0), 0, 100);
   state.resources.employment = clamp(state.resources.employment + (annualEvent.employment || 0), 0, 100);
 
-  state.rank = computeRawRankings();
+  advanceRankingSnapshot(state, year);
   const ranks = getRankings();
   const report = {
     year,
@@ -3597,13 +4795,13 @@ function settleYear() {
     costs,
     profit,
     students,
-    graduates: graduated,
+    graduates: state.lastGraduationCount || 0,
     event: annualEvent,
     strength: ranks.strength,
     provincial: ranks.provincial,
     national: ranks.national,
     overview:
-      graduated > 0
+      (state.lastGraduationCount || 0) > 0
         ? `首届毕业生离开校园，学校完成了从招生、培养到就业的完整育人周期。`
         : `学校完成第${state.history.length + 1}个学年的教学与经营工作，新的办学数据已经进入评分模型。`,
     cohortNotes,
@@ -3612,7 +4810,7 @@ function settleYear() {
   state.history.unshift({
     year,
     students,
-    graduates: graduated,
+    graduates: state.lastGraduationCount || 0,
     income,
     costs,
     profit,
@@ -3632,12 +4830,8 @@ function settleYear() {
   );
 
   state.time.turn += 1;
-  state.time.year += 1;
   state.governance.facultyHires = 0;
-  state.admissions.planStatus = "not_started";
-  state.admissions.approvedTotal = 0;
-  state.admissions.campaignDone = false;
-  redistributeAdmissionDraft();
+  state.lastGraduationCount = 0;
   addNews(
     `${state.time.year}年新学期工作部署会召开`,
     "会议围绕人才培养、招生就业、科研平台和校园建设部署新一年重点任务。",
@@ -3647,7 +4841,7 @@ function settleYear() {
 
   saveState();
   renderApp();
-  openModal("annual-report");
+  if (!silent) openModal("annual-report");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
