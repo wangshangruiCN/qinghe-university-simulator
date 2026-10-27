@@ -2971,6 +2971,10 @@ svg {
   gap: 3px;
 }
 
+.uni-mobile-tags {
+  display: none;
+}
+
 .uni-tag {
   display: inline-flex;
   align-items: center;
@@ -3942,6 +3946,53 @@ svg {
 
   #toast-root {
     top: calc(106px + env(safe-area-inset-top));
+    right: 12px;
+    bottom: auto;
+    left: 12px;
+    width: auto;
+  }
+
+  .rankings-panel .panel-head {
+    display: block;
+  }
+
+  .rankings-panel .segmented {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 10px;
+  }
+
+  .rankings-panel .segmented button {
+    padding: 6px 4px;
+    font-size: 10px;
+  }
+
+  .rank-tag-col,
+  .rank-eval-col {
+    display: none;
+  }
+
+  .uni-mobile-tags {
+    display: flex;
+    margin-top: 4px;
+  }
+
+  .rank-table th,
+  .rank-table td {
+    padding: 8px 7px;
+  }
+
+  .rank-table .uni-name {
+    font-size: 11px;
+  }
+
+  .rank-number {
+    width: 32px;
+  }
+
+  .rank-table-wrap {
+    overflow-x: visible;
   }
 
   .content {
@@ -4102,9 +4153,30 @@ svg {
   }
 
   .info-grid,
-  .ranking-summary,
   .annual-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ranking-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .rank-summary-card {
+    min-width: 0;
+    padding: 11px 9px;
+  }
+
+  .rank-summary-card span,
+  .rank-summary-card small {
+    font-size: 8px;
+    line-height: 1.45;
+  }
+
+  .rank-summary-card strong {
+    margin: 3px 0;
+    font-size: 18px;
+    white-space: nowrap;
   }
 
   .plan-row {

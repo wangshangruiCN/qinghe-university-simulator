@@ -15,8 +15,20 @@ import {
   WORLD_UNIVERSITIES,
 } from "./data.js";
 
-const APP_VERSION = "0.3.1";
+const APP_VERSION = "0.3.2";
 const CHANGELOG = [
+  {
+    version: "v0.3.2",
+    date: "2026-10-27",
+    summary: "手机排行榜紧凑布局",
+    items: [
+      "手机端四川省、全国、世界排名卡改为同一行水平排列",
+      "985、211、双一流标签移到校名下方横向显示",
+      "手机榜单隐藏单独标签列与评分条列，降低行高",
+      "排行榜页签改为三等分布局，390px 与 694px 宽度无横向溢出",
+      "修复中等手机宽度下提示框被拉成长条的问题",
+    ],
+  },
   {
     version: "v0.3.1",
     date: "2026-10-27",
@@ -2540,7 +2552,7 @@ function renderRankings(ranks) {
       </div>
     </div>
 
-    <section class="panel">
+    <section class="panel rankings-panel">
       <div class="panel-head" style="align-items:center">
             <div>
               <h3>${title}</h3>
@@ -2554,18 +2566,18 @@ function renderRankings(ranks) {
       <div class="panel-body flush">
         <div class="rank-table-wrap">
           <table class="rank-table">
-            <thead><tr><th>位次</th><th>高校</th><th>标签</th><th>${ui.rankingTab === "world" ? "国家/地区" : "城市"}</th><th>模拟得分 / ${scoreScaleMax}</th><th>评价</th></tr></thead>
+            <thead><tr><th>位次</th><th>高校</th><th class="rank-tag-col">标签</th><th>${ui.rankingTab === "world" ? "国家/地区" : "城市"}</th><th class="rank-score-col">模拟得分 / ${scoreScaleMax}</th><th class="rank-eval-col">评价</th></tr></thead>
             <tbody>
               ${rows
                 .map(
                   (item) => `
                     <tr class="${item.you ? "you" : ""}">
                       <td class="rank-number">${String(item.rank).padStart(2, "0")}</td>
-                      <td><span class="uni-name">${escapeHtml(item.name)}</span>${item.you ? ` <span class="badge badge-gold">本校</span>` : ""}</td>
-                      <td>${renderUniversityTags(item)}</td>
+                      <td><span class="uni-name">${escapeHtml(item.name)}</span>${item.you ? ` <span class="badge badge-gold">本校</span>` : ""}<div class="uni-mobile-tags">${renderUniversityTags(item)}</div></td>
+                      <td class="rank-tag-col">${renderUniversityTags(item)}</td>
                       <td>${escapeHtml(item.country || item.city || "—")}</td>
-                      <td class="mono">${Number(item.score).toFixed(1)}</td>
-                      <td><div class="score-bar"><div class="score-bar-track"><div class="score-bar-fill" style="width:${clamp((item.score / scoreScaleMax) * 100, 0, 100)}%"></div></div><span class="mono">${Math.round(item.score)}</span></div></td>
+                      <td class="mono rank-score-col">${Number(item.score).toFixed(1)}</td>
+                      <td class="rank-eval-col"><div class="score-bar"><div class="score-bar-track"><div class="score-bar-fill" style="width:${clamp((item.score / scoreScaleMax) * 100, 0, 100)}%"></div></div><span class="mono">${Math.round(item.score)}</span></div></td>
                     </tr>
                   `,
                 )
