@@ -10,7 +10,7 @@
 - 仓库地址：https://github.com/wangshangruiCN/qinghe-university-simulator
 - 线上地址（手机优先）：https://cdn.jsdelivr.net/gh/wangshangruiCN/qinghe-university-simulator@main/index.html
 - 备用地址：https://wangshangruicn.github.io/qinghe-university-simulator/
-- 当前版本：0.2.0（学院重构、招生配额、排名、版本公告、手机顶栏修复）
+- 当前版本：0.2.1（公告弹窗与手机官网预览修复）
 - 本文档状态：已确认并执行中
 - 最后更新：2026-10-27
 

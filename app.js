@@ -10,7 +10,7 @@ import {
   WORLD_UNIVERSITIES,
 } from "./data.js";
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "0.2.1";
 const CHANGELOG = [
   "学院体系重构：10 个具体学院，专业直接归属学院",
   "修复任何学院都能开设任意专业的问题",
