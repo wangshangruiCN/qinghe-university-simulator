@@ -18,7 +18,9 @@ const CHANGELOG = [
   "修复全国榜与世界榜不显示本校位次的问题",
   "招生改为按培养容量分四年自动分配",
   "修复手机端帮助按钮不可见、不可点击的问题",
+  "修复手机顶栏官网预览按钮显示与点击问题",
   "开始页与设置页显示当前版本号",
+  "更新公告改为可关闭的版本弹窗",
 ];
 
 const LEGACY_COLLEGE_MAP = {
@@ -428,10 +430,10 @@ function renderLanding() {
             <div class="start-point"><strong>真实规则</strong><span>审批 · 招生 · 学位点</span></div>
             <div class="start-point"><strong>长期主义</strong><span>从省内榜单走向世界</span></div>
           </div>
-          <details class="start-changelog">
-            <summary>本次更新内容</summary>
-            <ul>${CHANGELOG.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-          </details>
+          <button class="start-changelog-button" type="button" data-action="open-changelog">
+            <span>查看 v${APP_VERSION} 更新内容</span>
+            <span aria-hidden="true">→</span>
+          </button>
         </section>
 
         <section class="contract-wrap" aria-label="办学合同">
@@ -712,9 +714,9 @@ function renderApp() {
             <span class="save-state" data-save-state>已自动保存</span>
             <div class="topbar-actions">
               <button class="icon-btn" type="button" data-action="open-tutorial" aria-label="打开教程">?</button>
-              <button class="btn btn-outline btn-sm" type="button" data-action="open-site" title="打开校园官网"><span aria-hidden="true">▤</span><span>官网预览</span></button>
+              <button class="btn btn-outline btn-sm site-preview-btn" type="button" data-action="open-site" title="打开校园官网" aria-label="打开校园官网"><span class="site-preview-icon" aria-hidden="true">▤</span><span class="site-preview-label">官网预览</span></button>
             </div>
-            <button class="btn btn-dark btn-sm" type="button" data-action="open-advance">结束本学年 <span aria-hidden="true">→</span></button>
+            <button class="btn btn-dark btn-sm end-year-btn" type="button" data-action="open-advance">结束本学年 <span class="end-year-arrow" aria-hidden="true">→</span></button>
           </div>
         </header>
         <main class="content">${viewContent}</main>
@@ -1875,7 +1877,7 @@ function closeModal() {
 }
 
 function renderModal() {
-  if (!ui.modal || !state) {
+  if (!ui.modal || (!state && ui.modal.type !== "changelog")) {
     modalRoot.innerHTML = "";
     return;
   }
@@ -1905,6 +1907,7 @@ function modalHeader(title, subtitle, close = true) {
 function getModalContent(type, ctx) {
   if (type === "tutorial") return modalTutorial();
   if (type === "save-menu") return modalSaveMenu();
+  if (type === "changelog") return modalChangelog();
   if (type === "initial-college") return modalCollegeChoice(true);
   if (type === "add-college") return modalCollegeChoice(false);
   if (type === "add-program") return modalAddProgram(ctx);
@@ -1968,16 +1971,34 @@ function modalSaveMenu() {
           <span class="status-pill status-success">自动保存</span>
         </div>
         <div class="notice" style="margin-bottom:12px"><span class="notice-icon">版</span><span>当前版本 v${APP_VERSION} · 数据仅保存在当前浏览器本地。</span></div>
-        <details class="start-changelog" style="margin-bottom:12px">
-          <summary>本次更新内容</summary>
-          <ul>${CHANGELOG.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-        </details>
+        <button class="btn btn-outline" style="width:100%;margin-bottom:12px" type="button" data-action="open-changelog">查看 v${APP_VERSION} 更新内容</button>
         <div class="form-grid">
           <button class="btn btn-outline" type="button" data-action="export-save">导出存档</button>
           <button class="btn btn-outline" type="button" data-action="return-title">返回标题页</button>
         </div>
         <div class="modal-callout danger" style="margin-top:15px">新开一局会覆盖当前自动存档。建议先导出备份。</div>
         <button class="btn btn-danger-soft" style="width:100%" type="button" data-action="reset-game">重新开始一局</button>
+      </div>
+    `,
+  };
+}
+
+function modalChangelog() {
+  return {
+    size: "narrow",
+    html: `
+      ${modalHeader(`v${APP_VERSION} 更新如下`, "2026-10-27 · 青禾计划版本公告")}
+      <div class="modal-body">
+        <div class="notice" style="margin-bottom:15px">
+          <span class="notice-icon">版</span>
+          <span>本次更新重点修复学院专业归属、招生配额、排名与手机端操作问题。</span>
+        </div>
+        <ul class="changelog-list">
+          ${CHANGELOG.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+        </ul>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-dark" type="button" data-action="close-modal">知道了</button>
       </div>
     `,
   };
@@ -2607,6 +2628,9 @@ function handleClick(event) {
       break;
     case "open-tutorial":
       openModal("tutorial");
+      break;
+    case "open-changelog":
+      openModal("changelog");
       break;
     case "tutorial-go":
       ui.view = actionNode.dataset.view || "dashboard";

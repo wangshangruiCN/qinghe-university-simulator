@@ -564,28 +564,42 @@ svg {
   letter-spacing: 0.12em;
 }
 
-.start-changelog {
+.start-changelog-button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 28px;
-  padding: 11px 13px;
+  padding: 11px 14px;
   border: 1px solid rgba(225, 210, 177, 0.16);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.035);
-  color: #b8c8c3;
-}
-
-.start-changelog summary {
-  cursor: pointer;
   color: #d8c69f;
   font-size: 11px;
   font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
 }
 
-.start-changelog ul {
-  margin: 9px 0 0;
-  padding-left: 18px;
+.start-changelog-button:hover {
+  border-color: rgba(225, 210, 177, 0.34);
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.changelog-list {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding-left: 20px;
   color: #9fb2ad;
-  font-size: 10px;
-  line-height: 1.8;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.changelog-list li::marker {
+  color: var(--red);
 }
 
 .contract-wrap {
@@ -3890,8 +3904,17 @@ svg {
     display: none;
   }
 
-  .topbar-right .btn span {
+  .site-preview-label,
+  .end-year-arrow {
     display: none;
+  }
+
+  .site-preview-btn {
+    display: inline-grid;
+    width: 38px;
+    min-height: 38px;
+    padding: 0;
+    place-items: center;
   }
 
   .content {
